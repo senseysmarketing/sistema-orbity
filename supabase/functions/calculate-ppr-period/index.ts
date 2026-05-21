@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
     if (pErr || !period) throw new HttpError(404, 'Period not found');
 
     const p = period as PeriodRow;
+    periodAgencyId = p.agency_id;
 
     // Authorize
     const auth = await assertAgencyAccess(req, supabase as any, p.agency_id, ['owner', 'admin']);
