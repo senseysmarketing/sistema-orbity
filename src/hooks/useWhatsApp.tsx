@@ -132,7 +132,7 @@ export function useWhatsApp(purpose: string = 'general') {
     },
   });
 
-  // Check and reconfigure Evolution API webhook URL
+  // Check and reconfigure Uazapi webhook URL
   const checkWebhook = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('whatsapp-connect', {
@@ -143,7 +143,7 @@ export function useWhatsApp(purpose: string = 'general') {
     },
     onSuccess: (data) => {
       if (data?.action === 'reconfigured') {
-        toast({ title: 'Webhook reconfigurado', description: 'O Evolution API foi atualizado com a URL correta.' });
+        toast({ title: 'Webhook reconfigurado', description: 'O Uazapi foi atualizado com a URL correta.' });
       } else {
         toast({ title: 'Webhook OK', description: 'A URL do webhook já está configurada corretamente.' });
       }
@@ -319,7 +319,7 @@ export function useWhatsApp(purpose: string = 'general') {
     mutationFn: async (params: { lead_id: string; phone_number: string }) => {
       if (!account?.id) throw new Error('WhatsApp not configured');
 
-      // Normalize phone to digits-only so it matches what Evolution API sends in webhooks
+      // Normalize phone to digits-only so it matches what Uazapi sends in webhooks
       const normalizedPhone = params.phone_number.replace(/\D/g, '');
 
       // Get first greeting template
@@ -416,7 +416,7 @@ export function useWhatsApp(purpose: string = 'general') {
     },
   });
 
-  // Sync messages from Evolution API (on-demand)
+  // Sync messages from Uazapi (on-demand)
   const syncMessages = useMutation({
     mutationFn: async (params: { phone_number: string; conversation_id?: string }) => {
       if (!account?.id) throw new Error('WhatsApp not configured');
