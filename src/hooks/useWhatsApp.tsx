@@ -35,16 +35,6 @@ interface WhatsAppConversation {
   last_customer_message_at: string | null;
 }
 
-interface AutomationControl {
-  id: string;
-  lead_id: string;
-  status: string;
-  current_phase: string;
-  current_step_position: number;
-  conversation_state: string;
-  next_execution_at: string | null;
-}
-
 export function useWhatsApp(purpose: string = 'general') {
   const { currentAgency } = useAgency();
   const { toast } = useToast();
@@ -204,7 +194,6 @@ export function useWhatsApp(purpose: string = 'general') {
     onSuccess: (data, params) => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-conversation', account?.id, params.lead_id] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', data?.conversation_id || params.conversation_id] });
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-automation', account?.id, params.lead_id] });
     },
     onError: (error: Error) => {
       toast({ title: 'Erro ao enviar mensagem', description: error.message, variant: 'destructive' });
@@ -292,103 +281,6 @@ export function useWhatsApp(purpose: string = 'general') {
   };
 
 
-  // Get automation status for a lead
-  const useLeadAutomation = (leadId: string | null) => {
-    return useQuery({
-      queryKey: ['whatsapp-automation', account?.id, leadId],
-      queryFn: async () => {
-        if (!account?.id || !leadId) return null;
-        const { data, error } = await supabase
-          .from('whatsapp_automation_control')
-          .select('*')
-          .eq('account_id', account.id)
-          .eq('lead_id', leadId)
-          .maybeSingle();
-        if (error) throw error;
-        return data as AutomationControl | null;
-      },
-      enabled: !!account?.id && !!leadId,
-    });
-  };
-
-  // Start automation for a lead
-  const startAutomation = useMutation({
-    mutationFn: async (params: { lead_id: string; phone_number: string }) => {
-      if (!account?.id) throw new Error('WhatsApp not configured');
-
-      const normalizedPhone = params.phone_number.replace(/\D/g, '');
-
-      // Get first greeting template
-      const { data: firstTemplate } = await supabase
-        .from('whatsapp_message_templates')
-        .select('delay_minutes')
-        .eq('agency_id', currentAgency?.id)
-        .eq('phase', 'greeting')
-        .eq('step_position', 1)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (!firstTemplate) throw new Error('Nenhum template de saudação configurado');
-
-      // Resolve the canonical conversation (handles duplicates + linking).
-      const { data: resolveData, error: resolveError } = await supabase.functions.invoke(
-        'resolve-whatsapp-conversation',
-        {
-          body: {
-            account_id: account.id,
-            lead_id: params.lead_id,
-            phone_number: normalizedPhone,
-          },
-        }
-      );
-      if (resolveError) throw resolveError;
-      if (!resolveData?.success || !resolveData?.conversation_id) {
-        throw new Error(resolveData?.error || 'Não foi possível resolver a conversa do lead.');
-      }
-      const conversationId: string = resolveData.conversation_id;
-
-      const nextExecution = new Date(Date.now() + firstTemplate.delay_minutes * 60 * 1000).toISOString();
-
-      const { error: automError } = await supabase
-        .from('whatsapp_automation_control')
-        .upsert({
-          account_id: account.id,
-          lead_id: params.lead_id,
-          conversation_id: conversationId,
-          status: 'active',
-          current_phase: 'greeting',
-          current_step_position: 1,
-          next_execution_at: nextExecution,
-          conversation_state: 'new_lead',
-        }, { onConflict: 'account_id,lead_id' });
-
-      if (automError) throw automError;
-      return { success: true };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-automation'] });
-      toast({ title: 'Automação iniciada!' });
-    },
-    onError: (error: Error) => {
-      toast({ title: 'Erro ao iniciar automação', description: error.message, variant: 'destructive' });
-    },
-  });
-
-  // Pause/resume automation
-  const toggleAutomation = useMutation({
-    mutationFn: async (params: { automation_id: string; action: 'pause' | 'resume' }) => {
-      const newStatus = params.action === 'pause' ? 'paused' : 'active';
-      const { error } = await supabase
-        .from('whatsapp_automation_control')
-        .update({ status: newStatus })
-        .eq('id', params.automation_id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-automation'] });
-    },
-  });
-
   // Sync messages from Uazapi (on-demand)
   const syncMessages = useMutation({
     mutationFn: async (params: { phone_number: string; conversation_id?: string }) => {
@@ -427,10 +319,7 @@ export function useWhatsApp(purpose: string = 'general') {
     hardReset,
     sendMessage,
     syncMessages,
-    startAutomation,
-    toggleAutomation,
     useConversationMessages,
     useLeadConversation,
-    useLeadAutomation,
   };
 }

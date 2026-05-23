@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { GitMerge, Target, MessageCircle, Link2, DollarSign, ArrowLeft } from "lucide-react";
 import { CustomStatusManager } from "./CustomStatusManager";
 import { LeadScoringConfig } from "./LeadScoringConfig";
-import { WhatsAppTemplateManager } from "./WhatsAppTemplateManager";
+import { WhatsAppAutomationFlows } from "./WhatsAppAutomationFlows";
 import { MetaIntegrationConfig } from "./MetaIntegrationConfig";
 import { WebhooksManager } from "./WebhooksManager";
 import { ManualInvestmentManager } from "./ManualInvestmentManager";
@@ -73,8 +73,8 @@ export function CRMSettings({ onViewChange }: CRMSettingsProps = {}) {
           />
           <HubCard
             icon={MessageCircle}
-            title="Cadência de WhatsApp"
-            description="Modelos de mensagem e sequências automáticas de follow-up"
+            title="Fluxos WhatsApp"
+            description="Automações com gatilhos, condições, delays, métricas e logs"
             onClick={() => setView("whatsapp")}
           />
           <HubCard
@@ -106,7 +106,7 @@ export function CRMSettings({ onViewChange }: CRMSettingsProps = {}) {
 
       {view === "status" && <CustomStatusManager />}
       {view === "scoring" && <LeadScoringConfig />}
-      {view === "whatsapp" && <WhatsAppTemplateManager />}
+      {view === "whatsapp" && <WhatsAppAutomationFlows />}
       {view === "sources" && (
         <>
           <MetaIntegrationConfig />

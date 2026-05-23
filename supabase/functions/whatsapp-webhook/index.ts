@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseMessageStatus } from "../_shared/uazapi.ts";
 import { extractMessageContent, normalizePhone, previewOf } from "../_shared/whatsapp.ts";
 import { resolveLeadConversation, logWebhookEvent } from "../_shared/whatsapp-conversation.ts";
+import { stopExecutionsForLeadReply, triggerAutomationFlows } from "../_shared/automation-engine.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -299,34 +300,49 @@ serve(async (req) => {
         action_taken: fromMe ? 'manual_outbound_received' : 'message_received',
       });
 
-      // Apenas inbound real do lead pausa automação e move para Em Contato
+      // Apenas inbound real do lead aciona regras dos fluxos e move para Em Contato
       if (!fromMe) {
-        const pauseQuery = conversation.lead_id
-          ? supabase
-              .from('whatsapp_automation_control')
-              .update({ status: 'responded', conversation_state: 'customer_replied' })
-              .eq('account_id', account.id)
-              .eq('lead_id', conversation.lead_id)
-              .in('status', ['active', 'processing'])
-          : supabase
-              .from('whatsapp_automation_control')
-              .update({ status: 'responded', conversation_state: 'customer_replied' })
-              .eq('conversation_id', conversation.id)
-              .in('status', ['active', 'processing']);
-        const { count: pausedCount } = await pauseQuery.select('id', { count: 'exact', head: true });
-
-        if (pausedCount && pausedCount > 0) {
-          await logWebhookEvent(supabase, {
-            account_id: account.id,
-            agency_id: account.agency_id,
-            lead_id: conversation.lead_id,
-            conversation_id: conversation.id,
-            event,
-            action_taken: 'automation_paused_customer_replied',
-          });
-        }
-
         if (conversation.lead_id) {
+          const stopResult = await stopExecutionsForLeadReply(supabase, {
+            agencyId: account.agency_id,
+            leadId: conversation.lead_id,
+            conversationId: conversation.id,
+            payload: { message_id: messageId, content, message_type: messageType },
+          });
+          if (stopResult.stopped > 0) {
+            await logWebhookEvent(supabase, {
+              account_id: account.id,
+              agency_id: account.agency_id,
+              lead_id: conversation.lead_id,
+              conversation_id: conversation.id,
+              event,
+              action_taken: 'automation_flows_stopped_lead_replied',
+            });
+          }
+
+          const triggerResult = await triggerAutomationFlows(supabase, {
+            agencyId: account.agency_id,
+            leadId: conversation.lead_id,
+            triggerType: 'whatsapp_message_received',
+            payload: {
+              message_id: messageId,
+              content,
+              message_type: messageType,
+              phone_number: phoneNumber,
+              conversation_id: conversation.id,
+            },
+          });
+          if (triggerResult.started > 0) {
+            await logWebhookEvent(supabase, {
+              account_id: account.id,
+              agency_id: account.agency_id,
+              lead_id: conversation.lead_id,
+              conversation_id: conversation.id,
+              event,
+              action_taken: 'automation_flows_triggered_by_message',
+            });
+          }
+
           const promo = await maybePromoteLeadOnReply(supabase, account.agency_id, conversation.lead_id);
           if (promo.moved) {
             await logWebhookEvent(supabase, {

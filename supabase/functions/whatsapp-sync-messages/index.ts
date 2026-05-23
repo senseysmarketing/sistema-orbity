@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { assertAgencyAccess, HttpError } from "../_shared/auth.ts";
 import { resolveLeadConversation } from "../_shared/whatsapp-conversation.ts";
+import { stopExecutionsForLeadReply, triggerAutomationFlows } from "../_shared/automation-engine.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -238,48 +239,35 @@ serve(async (req) => {
         .update(updatePayload)
         .eq('id', convId);
 
-      // If sync surfaced inbound messages that postdate our last automated
-      // followup, mirror webhook side-effects: pause automation + move lead to
-      // "Em Contato" if the agency toggle is on.
+      // If sync surfaced inbound messages, mirror webhook side-effects for the
+      // new WhatsApp automation flow engine.
       if (latestCustomer?.created_at) {
-        const { data: automation } = await supabase
-          .from('whatsapp_automation_control')
-          .select('id, lead_id, last_followup_sent_at, started_at, status')
-          .eq('account_id', account_id)
-          .eq('conversation_id', convId)
-          .maybeSingle();
-        if (automation && !['responded', 'finished'].includes(automation.status)) {
-          const ref = automation.last_followup_sent_at || automation.started_at;
-          if (!ref || new Date(latestCustomer.created_at).getTime() > new Date(ref).getTime()) {
-            await supabase
-              .from('whatsapp_automation_control')
-              .update({ status: 'responded', conversation_state: 'customer_replied' })
-              .eq('id', automation.id);
-
-            if (automation.lead_id) {
-              const { data: agency } = await supabase
-                .from('agencies').select('whatsapp_auto_contact').eq('id', account.agency_id).maybeSingle();
-              if (agency?.whatsapp_auto_contact) {
-                const { data: lead } = await supabase
-                  .from('leads').select('status').eq('id', automation.lead_id).maybeSingle();
-                const s = String(lead?.status || '').toLowerCase();
-                if (['leads', 'new', 'novo'].includes(s)) {
-                  await supabase.from('leads').update({ status: 'em_contato' }).eq('id', automation.lead_id);
-                  await supabase.from('lead_history').insert({
-                    lead_id: automation.lead_id,
-                    agency_id: account.agency_id,
-                    user_id: null,
-                    action_type: 'whatsapp_interaction',
-                    field_name: 'status',
-                    old_value: lead?.status,
-                    new_value: 'em_contato',
-                    description: 'Resposta detectada via sincronização manual. Movido para Em Contato.',
-                  });
-                }
-              }
-            }
-          }
+        if (resolvedLeadId) {
+          await stopExecutionsForLeadReply(supabase, {
+            agencyId: account.agency_id,
+            leadId: resolvedLeadId,
+            conversationId: convId,
+            payload: {
+              message_id: latestCustomer.message_id,
+              content: latestCustomer.content || '',
+              synced_at: new Date().toISOString(),
+            },
+          });
+          await triggerAutomationFlows(supabase, {
+            agencyId: account.agency_id,
+            leadId: resolvedLeadId,
+            triggerType: 'whatsapp_message_received',
+            payload: {
+              message_id: latestCustomer.message_id,
+              content: latestCustomer.content || '',
+              message_type: latestCustomer.message_type,
+              phone_number: digits,
+              conversation_id: convId,
+              source: 'manual_sync',
+            },
+          });
         }
+
       }
     }
 
