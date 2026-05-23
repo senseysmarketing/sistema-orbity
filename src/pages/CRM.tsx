@@ -415,7 +415,7 @@ export default function CRM() {
                   "sm:max-w-md": crmSettingsView === "hub",
                   "sm:max-w-lg": crmSettingsView === "status",
                   "sm:max-w-2xl": crmSettingsView === "scoring" || crmSettingsView === "investments",
-                  "sm:max-w-5xl": crmSettingsView === "whatsapp",
+                  "sm:max-w-6xl": crmSettingsView === "whatsapp",
                   "sm:max-w-3xl": crmSettingsView === "sources",
                 }
               )}

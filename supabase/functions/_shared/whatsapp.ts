@@ -45,13 +45,13 @@ export function extractMessageContent(input: any): { content: string; messageTyp
   return { content: '', messageType: 'unknown' };
 }
 
-/** Replaces {{key}} placeholders. Unknown keys become empty strings. */
+/** Replaces {{key}} and {key} placeholders. Unknown keys become empty strings. */
 export function formatTemplateVariables(
   template: string,
   vars: Record<string, string | number | null | undefined>,
 ): string {
   if (!template) return '';
-  return template.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_match, key: string) => {
+  const resolve = (key: string) => {
     const k = key.trim();
     if (vars[k] !== undefined && vars[k] !== null) return String(vars[k]);
     const lc = k.toLowerCase();
@@ -59,7 +59,10 @@ export function formatTemplateVariables(
       if (vk.toLowerCase() === lc && vv !== undefined && vv !== null) return String(vv);
     }
     return '';
-  });
+  };
+  return template
+    .replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_match, key: string) => resolve(key))
+    .replace(/(?<!\{)\{\s*([\w.-]+)\s*\}(?!\})/g, (_match, key: string) => resolve(key));
 }
 
 export interface ResolveConversationArgs {
