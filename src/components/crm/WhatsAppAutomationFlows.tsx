@@ -947,6 +947,10 @@ export function WhatsAppAutomationFlows() {
                           <Copy className="mr-2 h-4 w-4" />
                           Duplicar
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExportFlow(flow)}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Exportar
+                        </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => deleteFlow.mutate(flow.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
                           Excluir
