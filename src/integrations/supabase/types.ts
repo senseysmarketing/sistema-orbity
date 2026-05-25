@@ -1003,6 +1003,460 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_execution_logs: {
+        Row: {
+          agency_id: string
+          created_at: string
+          event_type: string
+          execution_id: string | null
+          flow_id: string | null
+          id: string
+          lead_id: string | null
+          message: string | null
+          metadata: Json
+          step_id: string | null
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          event_type: string
+          execution_id?: string | null
+          flow_id?: string | null
+          id?: string
+          lead_id?: string | null
+          message?: string | null
+          metadata?: Json
+          step_id?: string | null
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          event_type?: string
+          execution_id?: string | null
+          flow_id?: string | null
+          id?: string
+          lead_id?: string | null
+          message?: string | null
+          metadata?: Json
+          step_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_execution_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_execution_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "automation_execution_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "automation_execution_logs_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "automation_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_execution_logs_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_execution_logs_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_execution_logs_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "automation_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_executions: {
+        Row: {
+          agency_id: string
+          completed_at: string | null
+          conversation_id: string | null
+          created_at: string
+          current_step_id: string | null
+          flow_id: string
+          id: string
+          last_activity_at: string
+          last_error: string | null
+          lead_id: string
+          started_at: string
+          status: string
+          stop_reason: string | null
+          trigger_payload: Json
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          completed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          current_step_id?: string | null
+          flow_id: string
+          id?: string
+          last_activity_at?: string
+          last_error?: string | null
+          lead_id: string
+          started_at?: string
+          status?: string
+          stop_reason?: string | null
+          trigger_payload?: Json
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          completed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          current_step_id?: string | null
+          flow_id?: string
+          id?: string
+          last_activity_at?: string
+          last_error?: string | null
+          lead_id?: string
+          started_at?: string
+          status?: string
+          stop_reason?: string | null
+          trigger_payload?: Json
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_executions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_executions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "automation_executions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "automation_executions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_executions_current_step_id_fkey"
+            columns: ["current_step_id"]
+            isOneToOne: false
+            referencedRelation: "automation_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_executions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_executions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_flows: {
+        Row: {
+          agency_id: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          description: string | null
+          id: string
+          is_deleted: boolean
+          metrics: Json
+          name: string
+          status: string
+          stop_rules: Json
+          trigger_config: Json
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          is_deleted?: boolean
+          metrics?: Json
+          name: string
+          status?: string
+          stop_rules?: Json
+          trigger_config?: Json
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          is_deleted?: boolean
+          metrics?: Json
+          name?: string
+          status?: string
+          stop_rules?: Json
+          trigger_config?: Json
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_flows_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_flows_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "automation_flows_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      automation_pending_actions: {
+        Row: {
+          action_type: string
+          agency_id: string
+          attempts: number
+          created_at: string
+          execution_id: string
+          flow_id: string
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lead_id: string
+          locked_at: string | null
+          payload: Json
+          run_at: string
+          status: string
+          step_id: string
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          agency_id: string
+          attempts?: number
+          created_at?: string
+          execution_id: string
+          flow_id: string
+          id?: string
+          idempotency_key: string
+          last_error?: string | null
+          lead_id: string
+          locked_at?: string | null
+          payload?: Json
+          run_at?: string
+          status?: string
+          step_id: string
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          agency_id?: string
+          attempts?: number
+          created_at?: string
+          execution_id?: string
+          flow_id?: string
+          id?: string
+          idempotency_key?: string
+          last_error?: string | null
+          lead_id?: string
+          locked_at?: string | null
+          payload?: Json
+          run_at?: string
+          status?: string
+          step_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_pending_actions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_pending_actions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "automation_pending_actions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "automation_pending_actions_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "automation_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_pending_actions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_pending_actions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_pending_actions_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "automation_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_steps: {
+        Row: {
+          agency_id: string
+          config: Json
+          created_at: string
+          flow_id: string
+          id: string
+          is_deleted: boolean
+          next_step_id: string | null
+          position: number
+          step_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          config?: Json
+          created_at?: string
+          flow_id: string
+          id?: string
+          is_deleted?: boolean
+          next_step_id?: string | null
+          position: number
+          step_type: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          config?: Json
+          created_at?: string
+          flow_id?: string
+          id?: string
+          is_deleted?: boolean
+          next_step_id?: string | null
+          position?: number
+          step_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_steps_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_steps_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "automation_steps_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "automation_steps_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_steps_next_step_id_fkey"
+            columns: ["next_step_id"]
+            isOneToOne: false
+            referencedRelation: "automation_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_history: {
         Row: {
           agency_id: string
@@ -8344,6 +8798,42 @@ export type Database = {
         Args: { p_agency_id: string; p_event_key: string; p_payload: Json }
         Returns: undefined
       }
+      automation_compare_condition: {
+        Args: {
+          actual_array: string[]
+          actual_text: string
+          expected_text: string
+          operator_text: string
+        }
+        Returns: boolean
+      }
+      automation_conditions_match: {
+        Args: {
+          p_agency_id: string
+          p_conditions?: Json
+          p_lead_id: string
+          p_mode?: string
+          p_payload?: Json
+        }
+        Returns: boolean
+      }
+      automation_log_schedule_window_resumes: { Args: never; Returns: Json }
+      automation_next_schedule_run_at: {
+        Args: { p_from?: string; p_window?: Json }
+        Returns: string
+      }
+      automation_reschedule_pending_actions_for_windows: {
+        Args: never
+        Returns: Json
+      }
+      automation_schedule_weekday_key: {
+        Args: { p_date: string }
+        Returns: string
+      }
+      automation_schedule_window_enabled: {
+        Args: { p_window?: Json }
+        Returns: boolean
+      }
       check_agency_limits: {
         Args: {
           agency_uuid: string
@@ -8431,6 +8921,15 @@ export type Database = {
         }[]
       }
       get_user_agency_id: { Args: never; Returns: string }
+      increment_automation_flow_metric: {
+        Args: {
+          amount?: number
+          extra?: Json
+          flow_uuid: string
+          metric_key: string
+        }
+        Returns: undefined
+      }
       is_admin: { Args: never; Returns: boolean }
       is_agency_admin: { Args: { agency_uuid?: string }; Returns: boolean }
       is_agency_subscription_active: {
@@ -8476,6 +8975,24 @@ export type Database = {
       start_agency_trial: {
         Args: { p_agency_id: string; p_plan_slug?: string }
         Returns: undefined
+      }
+      start_automation_flows_for_lead: {
+        Args: {
+          p_agency_id: string
+          p_lead_id: string
+          p_payload?: Json
+          p_trigger_type: string
+        }
+        Returns: undefined
+      }
+      stop_automation_flows_for_lead_reply: {
+        Args: {
+          p_agency_id: string
+          p_conversation_id?: string
+          p_lead_id: string
+          p_payload?: Json
+        }
+        Returns: number
       }
       user_belongs_to_agency: {
         Args: { agency_uuid: string }
