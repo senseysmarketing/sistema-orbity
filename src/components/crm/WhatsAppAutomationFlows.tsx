@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAgency } from "@/hooks/useAgency";
+import { AutomationExecutionLogs } from "@/components/crm/AutomationExecutionLogs";
 import {
   buildAutomationFlowExport,
   downloadAutomationFlowFile,
@@ -964,6 +965,8 @@ export function WhatsAppAutomationFlows() {
           </TableBody>
         </Table>
       </div>
+
+      <AutomationExecutionLogs />
 
       <BuilderDialog
         open={builderOpen}
