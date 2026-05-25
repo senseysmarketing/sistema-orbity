@@ -534,6 +534,20 @@ function BuilderDialog({
           </p>
         </DialogHeader>
 
+        {importWarnings && importWarnings.length > 0 && (
+          <div className="px-6 pt-4">
+            <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertTitle>Fluxo importado — revise antes de ativar</AlertTitle>
+              <AlertDescription>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                  {importWarnings.map((w, i) => <li key={i}>{w}</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
         <div className="grid gap-6 px-6 py-5 lg:grid-cols-[320px_1fr]">
           <aside className="space-y-4">
             <div className="space-y-2">
