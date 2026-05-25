@@ -9,6 +9,8 @@ const arr = (v: unknown): any[] => (Array.isArray(v) ? v : []);
 const now = () => new Date().toISOString();
 const key = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, '_');
 const delayDate = (amount: number, unit: string) => new Date(Date.now() + Math.max(0, amount) * ({ minutes: 60_000, hours: 3_600_000, days: 86_400_000 }[unit] ?? 60_000));
+const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const DEFAULT_WINDOW_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const previewOf = (text: string, max = 120) => {
   const clean = (text || '').replace(/\s+/g, ' ').trim();
   return clean.length > max ? `${clean.slice(0, max)}...` : clean;
@@ -31,6 +33,96 @@ const formatTemplateVariables = (template: string, vars: Record<string, unknown>
     .replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_m, name) => read(name))
     .replace(/(?<!\{)\{\s*([\w.-]+)\s*\}(?!\})/g, (_m, name) => read(name));
 };
+
+const parseTime = (value: unknown, fallback: string) => {
+  const source = String(value || fallback);
+  const match = source.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return fallback === '17:00' ? 1020 : 480;
+  const hours = Math.min(23, Math.max(0, Number(match[1])));
+  const minutes = Math.min(59, Math.max(0, Number(match[2])));
+  return hours * 60 + minutes;
+};
+
+const zonedParts = (date: Date, timeZone: string) => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date);
+  const read = (type: string) => Number(parts.find((part) => part.type === type)?.value || 0);
+  return {
+    year: read('year'),
+    month: read('month'),
+    day: read('day'),
+    hour: read('hour'),
+    minute: read('minute'),
+    second: read('second'),
+  };
+};
+
+const timeZoneOffset = (date: Date, timeZone: string) => {
+  const p = zonedParts(date, timeZone);
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - date.getTime();
+};
+
+const localTimeToUtc = (parts: { year: number; month: number; day: number; hour: number; minute: number }, timeZone: string) => {
+  const guess = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, 0));
+  const first = new Date(guess.getTime() - timeZoneOffset(guess, timeZone));
+  return new Date(guess.getTime() - timeZoneOffset(first, timeZone));
+};
+
+export function getScheduleWindowRunAt(rawWindow: unknown, from = new Date()) {
+  const window = obj(rawWindow);
+  if (window.enabled !== true) {
+    return { enabled: false, isWithinWindow: true, runAt: from, timezone: String(window.timezone || 'America/Sao_Paulo') };
+  }
+
+  const timezone = String(window.timezone || 'America/Sao_Paulo');
+  const allowedDays = arr(window.days).map(key).filter(Boolean);
+  const days = allowedDays.length ? allowedDays : DEFAULT_WINDOW_DAYS;
+  const start = parseTime(window.start_time, '08:00');
+  const end = parseTime(window.end_time, '17:00');
+
+  if (end <= start) {
+    return { enabled: true, isWithinWindow: true, runAt: from, timezone, invalidWindow: true };
+  }
+
+  try {
+    const local = zonedParts(from, timezone);
+    const localMinutes = local.hour * 60 + local.minute;
+
+    for (let offset = 0; offset <= 14; offset++) {
+      const localDate = new Date(Date.UTC(local.year, local.month - 1, local.day + offset));
+      const dayKey = DAY_KEYS[localDate.getUTCDay()];
+      if (!days.includes(dayKey)) continue;
+
+      const base = {
+        year: localDate.getUTCFullYear(),
+        month: localDate.getUTCMonth() + 1,
+        day: localDate.getUTCDate(),
+      };
+
+      if (offset === 0 && localMinutes >= start && localMinutes < end) {
+        return { enabled: true, isWithinWindow: true, runAt: from, timezone };
+      }
+
+      if (offset === 0 && localMinutes >= end) continue;
+
+      const runAt = localTimeToUtc({ ...base, hour: Math.floor(start / 60), minute: start % 60 }, timezone);
+      return { enabled: true, isWithinWindow: false, runAt, timezone };
+    }
+  } catch (error) {
+    console.warn('[automation] invalid schedule window', { timezone, error });
+    return { enabled: true, isWithinWindow: true, runAt: from, timezone, invalidWindow: true };
+  }
+
+  return { enabled: true, isWithinWindow: true, runAt: from, timezone, invalidWindow: true };
+}
 
 export async function logExecutionEvent(db: Db, row: {
   execution_id?: string | null; flow_id?: string | null; agency_id: string; lead_id?: string | null;
@@ -134,8 +226,8 @@ function cmp(actual: unknown, opRaw: unknown, expected: unknown) {
   if (op === 'contains') return a.includes(e);
   if (op === 'not_contains') return !a.includes(e);
   if (op === 'not_equals') return a !== e;
-  if (op === 'greater_than') return Number(actual || 0) > Number(expected || 0);
-  if (op === 'less_than') return Number(actual || 0) < Number(expected || 0);
+  if (op === 'greater_than') return Number.isFinite(Number(actual)) && Number.isFinite(Number(expected)) && Number(actual) > Number(expected);
+  if (op === 'less_than') return Number.isFinite(Number(actual)) && Number.isFinite(Number(expected)) && Number(actual) < Number(expected);
   if (op === 'is_true') return actual === true || a === 'true' || a === 'sim';
   if (op === 'is_false') return actual === false || a === 'false' || a === 'nao';
   return a === e;
@@ -255,6 +347,20 @@ export async function processPendingAction(db: Db, pending: any) {
     await db.from('automation_pending_actions').update({ status: 'cancelled', last_error: 'Execucao indisponivel.' }).eq('id', pending.id);
     return { cancelled: true };
   }
+  if (flow.status !== 'active' || flow.is_deleted) {
+    await db.from('automation_pending_actions').update({ status: 'cancelled', last_error: 'flow_inactive' }).eq('id', pending.id);
+    await db.from('automation_executions').update({ status: 'stopped', stop_reason: 'flow_inactive', completed_at: now(), last_activity_at: now() }).eq('id', execution.id);
+    await logExecutionEvent(db, {
+      execution_id: execution.id,
+      flow_id: flow.id,
+      agency_id: execution.agency_id,
+      lead_id: execution.lead_id,
+      step_id: step.id,
+      event_type: 'schedule_window_cancelled',
+      message: 'Execucao cancelada porque o fluxo ficou inativo antes do horario agendado.',
+    });
+    return { cancelled: true };
+  }
   const l = await lead(db, execution.agency_id, execution.lead_id);
   if (!l) return stop(db, execution, 'lead_not_found');
   const reason = await stopReason(db, flow, execution, l);
@@ -267,6 +373,48 @@ export async function processPendingAction(db: Db, pending: any) {
   const all = await steps(db, flow.id);
   const c = obj(step.config);
   const p = obj(pending.payload);
+  const schedule = getScheduleWindowRunAt(obj(flow.trigger_config).schedule_window, new Date());
+
+  if (schedule.enabled && !schedule.isWithinWindow) {
+    const runAt = schedule.runAt.toISOString();
+    const nextPayload = { ...p, __schedule_window_waiting: true, __schedule_window_next_run_at: runAt };
+    await db.from('automation_pending_actions').update({
+      status: 'pending',
+      locked_at: null,
+      run_at: runAt,
+      payload: nextPayload,
+      last_error: 'waiting_schedule_window',
+    }).eq('id', pending.id);
+    await db.from('automation_executions').update({
+      status: 'waiting',
+      current_step_id: step.id,
+      last_activity_at: now(),
+    }).eq('id', execution.id);
+    await logExecutionEvent(db, {
+      execution_id: execution.id,
+      flow_id: flow.id,
+      agency_id: execution.agency_id,
+      lead_id: l.id,
+      step_id: step.id,
+      event_type: 'schedule_window_rescheduled',
+      message: 'Execucao reagendada para o proximo horario permitido.',
+      metadata: { next_run_at: runAt, timezone: schedule.timezone, step_type: step.step_type },
+    });
+    return { scheduled: true, run_at: runAt };
+  }
+
+  if (p.__schedule_window_waiting) {
+    await logExecutionEvent(db, {
+      execution_id: execution.id,
+      flow_id: flow.id,
+      agency_id: execution.agency_id,
+      lead_id: l.id,
+      step_id: step.id,
+      event_type: 'schedule_window_resumed',
+      message: 'Execucao retomada dentro da janela permitida.',
+      metadata: { scheduled_run_at: p.__schedule_window_next_run_at || null, timezone: schedule.timezone },
+    });
+  }
 
   if (step.step_type === 'condition') {
     const r = await evaluateConditions(db, c.conditions || [], l, { ...p, condition_mode: c.mode || 'all', started_at: execution.started_at });
@@ -307,15 +455,32 @@ export async function processPendingAction(db: Db, pending: any) {
 async function start(db: Db, flow: any, l: any, triggerType: string, payload: Json) {
   const all = await steps(db, flow.id);
   const first = all[0];
+  const schedule = getScheduleWindowRunAt(obj(flow.trigger_config).schedule_window, new Date());
+  const firstRunAt = first && schedule.enabled && !schedule.isWithinWindow ? schedule.runAt : new Date();
+  const firstPayload = first && schedule.enabled && !schedule.isWithinWindow
+    ? { ...payload, __schedule_window_waiting: true, __schedule_window_next_run_at: firstRunAt.toISOString() }
+    : payload;
   const { data: execution, error } = await db.from('automation_executions').insert({
-    flow_id: flow.id, agency_id: flow.agency_id, lead_id: l.id, status: first ? 'running' : 'completed',
+    flow_id: flow.id, agency_id: flow.agency_id, lead_id: l.id, status: first ? (firstRunAt.getTime() > Date.now() + 1000 ? 'waiting' : 'running') : 'completed',
     current_step_id: first?.id ?? null, trigger_type: triggerType, trigger_payload: payload, completed_at: first ? null : now(),
   }).select().single();
   if (error) return error.code === '23505' ? { skipped: true, reason: 'active_execution_exists' } : Promise.reject(error);
   await logExecutionEvent(db, { execution_id: execution.id, flow_id: flow.id, agency_id: flow.agency_id, lead_id: l.id, event_type: 'flow_entered', message: 'Lead entrou no fluxo.', metadata: { trigger_type: triggerType, payload } });
+  if (first && schedule.enabled && !schedule.isWithinWindow) {
+    await logExecutionEvent(db, {
+      execution_id: execution.id,
+      flow_id: flow.id,
+      agency_id: flow.agency_id,
+      lead_id: l.id,
+      step_id: first.id,
+      event_type: 'schedule_window_delayed',
+      message: 'Fluxo disparado fora da janela permitida.',
+      metadata: { next_run_at: firstRunAt.toISOString(), timezone: schedule.timezone, schedule_window: obj(flow.trigger_config).schedule_window || {} },
+    });
+  }
   await incrementFlowMetric(db, flow.id, 'entered', 1, { last_execution_at: now() });
-  if (first) await enqueue(db, execution, first, new Date(), payload);
-  return { started: true, execution_id: execution.id };
+  if (first) await enqueue(db, execution, first, firstRunAt, firstPayload);
+  return { started: true, execution_id: execution.id, scheduled_for: firstRunAt.toISOString(), waiting_schedule_window: firstRunAt.getTime() > Date.now() + 1000 };
 }
 
 export async function triggerAutomationFlows(db: Db, args: { agencyId: string; leadId: string; triggerType: string; payload?: Json }) {
