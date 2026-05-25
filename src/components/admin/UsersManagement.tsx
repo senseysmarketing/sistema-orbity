@@ -63,8 +63,6 @@ const PERMISSION_META: Record<keyof AppPermissions, { label: string; icon: typeo
   traffic: { label: "Tráfego", icon: TrendingUp },
   contracts: { label: "Contratos", icon: FileText },
   email_marketing: { label: "E-mail Marketing", icon: Mail },
-  nps: { label: "NPS", icon: MessageSquareHeart },
-  goals: { label: "Metas", icon: Trophy },
   financial: { label: "Financeiro", icon: DollarSign },
   reports: { label: "Relatórios", icon: BarChart3 },
   import_data: { label: "Importação", icon: Upload },

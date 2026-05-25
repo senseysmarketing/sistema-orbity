@@ -13,8 +13,6 @@ export interface AppPermissions {
   email_marketing: boolean;
 
   // Administração
-  nps: boolean;
-  goals: boolean;
   financial: boolean;
   reports: boolean;
   import_data: boolean;
@@ -30,8 +28,6 @@ export const DEFAULT_PERMISSIONS: AppPermissions = {
   traffic: false,
   contracts: false,
   email_marketing: false,
-  nps: false,
-  goals: false,
   financial: false,
   reports: false,
   import_data: false,
@@ -40,7 +36,7 @@ export const DEFAULT_PERMISSIONS: AppPermissions = {
 const ALL_FALSE: AppPermissions = {
   clients: false, tasks: false, reminders: false, agenda: false, crm: false,
   social_media: false, traffic: false, contracts: false, email_marketing: false,
-  nps: false, goals: false, financial: false, reports: false, import_data: false,
+  financial: false, reports: false, import_data: false,
 };
 
 export interface RolePreset {
@@ -86,7 +82,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     permissions: {
       ...ALL_FALSE,
       reminders: true, agenda: true,
-      clients: true, crm: true, nps: true, contracts: true,
+      clients: true, crm: true, contracts: true,
     },
   },
   {
@@ -97,7 +93,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     permissions: {
       clients: true, tasks: true, reminders: true, agenda: true, crm: true,
       social_media: true, traffic: true, contracts: true, email_marketing: true,
-      nps: true, goals: true, financial: false, reports: true, import_data: false,
+      financial: false, reports: true, import_data: false,
     },
   },
   {
@@ -113,7 +109,7 @@ export const ROLE_PRESETS: RolePreset[] = [
 const PERM_KEYS: (keyof AppPermissions)[] = [
   "clients", "tasks", "reminders", "agenda", "crm",
   "social_media", "traffic", "contracts", "email_marketing",
-  "nps", "goals", "financial", "reports", "import_data",
+  "financial", "reports", "import_data",
 ];
 
 export function detectPresetFromPermissions(perms: AppPermissions): string {

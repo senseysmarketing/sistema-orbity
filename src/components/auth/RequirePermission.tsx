@@ -14,8 +14,6 @@ type PermissionKey = Extract<
   | "canAccessTraffic"
   | "canAccessContracts"
   | "canAccessEmailMarketing"
-  | "canAccessNPS"
-  | "canAccessGoals"
   | "canAccessFinancial"
   | "canAccessReports"
   | "canAccessImport"

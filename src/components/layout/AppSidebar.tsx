@@ -3,7 +3,7 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Gauge, ContactRound, FileText, Instagram, Calendar, Upload, Trophy, MessageSquareHeart, Mail } from "lucide-react";
+import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Gauge, ContactRound, FileText, Instagram, Calendar, Upload, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { usePermissions, PermissionsResult } from "@/hooks/usePermissions";
@@ -22,8 +22,6 @@ type PermKey = Extract<
   | "canAccessTraffic"
   | "canAccessContracts"
   | "canAccessEmailMarketing"
-  | "canAccessNPS"
-  | "canAccessGoals"
   | "canAccessFinancial"
   | "canAccessReports"
   | "canAccessImport"
@@ -73,8 +71,6 @@ const menuCategories: MenuCategory[] = [
   {
     label: "Administração",
     items: [
-      { title: "NPS", url: "/dashboard/goals?tab=nps", icon: MessageSquareHeart, permission: "canAccessNPS" },
-      { title: "Performance & PPR", url: "/dashboard/goals", icon: Trophy, permission: "canAccessGoals" },
       { title: "Administrativo", url: "/dashboard/admin", icon: DollarSign, permission: "canAccessFinancial" },
       { title: "Importação", url: "/dashboard/import", icon: Upload, permission: "canAccessImport" },
       { title: "Configurações", url: "/dashboard/settings", icon: Settings },

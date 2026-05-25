@@ -93,8 +93,6 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     label: "Administração",
     icon: Settings2,
     items: [
-      { key: "nps", label: "NPS", description: "Pesquisas de satisfação.", icon: MessageSquareHeart },
-      { key: "goals", label: "Metas & Bônus", description: "PPR, scorecards e bonificações.", icon: Trophy },
       { key: "financial", label: "Administrativo (Financeiro)", description: "DRE, fluxo de caixa e despesas.", icon: DollarSign },
       { key: "reports", label: "Relatórios", description: "Relatórios analíticos.", icon: BarChart3 },
       { key: "import_data", label: "Importação", description: "Importar dados em massa.", icon: Upload },
