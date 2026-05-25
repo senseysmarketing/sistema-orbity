@@ -965,6 +965,8 @@ export function WhatsAppAutomationFlows() {
         </Table>
       </div>
 
+      <AutomationExecutionLogs />
+
       <BuilderDialog
         open={builderOpen}
         draft={draft}
