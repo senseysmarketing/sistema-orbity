@@ -969,7 +969,8 @@ export function WhatsAppAutomationFlows() {
         open={builderOpen}
         draft={draft}
         isSaving={isSaving}
-        onOpenChange={setBuilderOpen}
+        importWarnings={importWarnings}
+        onOpenChange={handleDialogOpenChange}
         onDraftChange={setDraft}
         onSave={handleSave}
       />
