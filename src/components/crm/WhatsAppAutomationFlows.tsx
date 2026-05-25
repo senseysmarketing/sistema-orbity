@@ -1,10 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
+  AlertTriangle,
   Bell,
   Bot,
   CheckCircle2,
   Clock3,
   Copy,
+  Download,
   GitBranch,
   ListChecks,
   MessageSquare,
@@ -15,8 +18,16 @@ import {
   Send,
   Settings2,
   Trash2,
+  Upload,
   Workflow,
 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAgency } from "@/hooks/useAgency";
+import {
+  buildAutomationFlowExport,
+  downloadAutomationFlowFile,
+  parseAutomationFlowImport,
+} from "@/lib/automation-flow-transfer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -459,6 +470,7 @@ function BuilderDialog({
   open,
   draft,
   isSaving,
+  importWarnings,
   onOpenChange,
   onDraftChange,
   onSave,
@@ -466,6 +478,7 @@ function BuilderDialog({
   open: boolean;
   draft: AutomationFlowDraft;
   isSaving: boolean;
+  importWarnings?: string[];
   onOpenChange: (open: boolean) => void;
   onDraftChange: (draft: AutomationFlowDraft) => void;
   onSave: () => void;
@@ -520,6 +533,20 @@ function BuilderDialog({
             Monte uma automação vertical com gatilho, condições, ações, delays e parada automática.
           </p>
         </DialogHeader>
+
+        {importWarnings && importWarnings.length > 0 && (
+          <div className="px-6 pt-4">
+            <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertTitle>Fluxo importado — revise antes de ativar</AlertTitle>
+              <AlertDescription>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                  {importWarnings.map((w, i) => <li key={i}>{w}</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
 
         <div className="grid gap-6 px-6 py-5 lg:grid-cols-[320px_1fr]">
           <aside className="space-y-4">
@@ -708,8 +735,11 @@ function BuilderDialog({
 
 export function WhatsAppAutomationFlows() {
   const { flows, isLoading, isSaving, saveFlow, toggleFlow, deleteFlow, duplicateFlow } = useWhatsAppAutomationFlows();
+  const { currentAgency } = useAgency();
   const [builderOpen, setBuilderOpen] = useState(false);
   const [draft, setDraft] = useState<AutomationFlowDraft>(() => defaultDraft());
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const totals = useMemo(() => {
     return flows.reduce(
@@ -727,18 +757,85 @@ export function WhatsAppAutomationFlows() {
 
   const openNew = () => {
     setDraft(defaultDraft());
+    setImportWarnings([]);
     setBuilderOpen(true);
   };
 
   const openEdit = (flow: AutomationFlow) => {
     setDraft(flowToDraft(flow));
+    setImportWarnings([]);
     setBuilderOpen(true);
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setBuilderOpen(open);
+    if (!open) setImportWarnings([]);
   };
 
   const handleSave = () => {
     saveFlow.mutate(draft, {
-      onSuccess: () => setBuilderOpen(false),
+      onSuccess: () => {
+        setBuilderOpen(false);
+        setImportWarnings([]);
+      },
     });
+  };
+
+  const handleExportFlow = (flow: AutomationFlow) => {
+    try {
+      const payload = buildAutomationFlowExport({ flow, agencyName: currentAgency?.name });
+      downloadAutomationFlowFile(payload, flow.name);
+      console.info("[AUTOMATION_FLOW_EXPORT_SUCCESS]", {
+        flowId: flow.id,
+        agencyId: currentAgency?.id,
+        stepCount: payload.steps.length,
+        warnings: payload.warnings.length,
+      });
+      if (payload.warnings.length > 0) {
+        toast.warning("Fluxo exportado com avisos", {
+          description: payload.warnings.slice(0, 3).join(" "),
+        });
+      } else {
+        toast.success("Fluxo exportado");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error("Erro ao exportar fluxo", { description: message });
+    }
+  };
+
+  const triggerImportPicker = () => {
+    if (!currentAgency) {
+      toast.error("Selecione uma agência antes de importar.");
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFlowFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 500 * 1024) {
+      toast.error("Arquivo muito grande (limite de 500 KB).");
+      return;
+    }
+    try {
+      const text = await file.text();
+      const result = parseAutomationFlowImport(text);
+      setDraft(result.form);
+      setImportWarnings(result.warnings);
+      setBuilderOpen(true);
+      console.info("[AUTOMATION_FLOW_IMPORT_PREVIEW]", {
+        agencyId: currentAgency?.id,
+        stepCount: result.form.steps.length,
+        warnings: result.warnings.length,
+      });
+      toast.success("Fluxo importado — revise e salve para persistir.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error("Não foi possível importar o fluxo", { description: message });
+    }
   };
 
   return (
@@ -750,11 +847,25 @@ export function WhatsAppAutomationFlows() {
             Gatilhos, condições, mensagens, delays e logs usando a Uazapi.
           </p>
         </div>
-        <Button variant="action" onClick={openNew}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo fluxo
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,.orbity-flow.json,application/json"
+            className="hidden"
+            onChange={handleImportFlowFile}
+          />
+          <Button variant="outline" onClick={triggerImportPicker}>
+            <Upload className="mr-2 h-4 w-4" />
+            Importar fluxo
+          </Button>
+          <Button variant="action" onClick={openNew}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo fluxo
+          </Button>
+        </div>
       </div>
+
 
       <div className="grid gap-3 sm:grid-cols-4">
         <MetricBox label="Leads que entraram" value={totals.entered} icon={Bot} />
@@ -836,6 +947,10 @@ export function WhatsAppAutomationFlows() {
                           <Copy className="mr-2 h-4 w-4" />
                           Duplicar
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExportFlow(flow)}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Exportar
+                        </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => deleteFlow.mutate(flow.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
                           Excluir
@@ -854,7 +969,8 @@ export function WhatsAppAutomationFlows() {
         open={builderOpen}
         draft={draft}
         isSaving={isSaving}
-        onOpenChange={setBuilderOpen}
+        importWarnings={importWarnings}
+        onOpenChange={handleDialogOpenChange}
         onDraftChange={setDraft}
         onSave={handleSave}
       />
