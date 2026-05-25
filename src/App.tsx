@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProductTourProvider } from "@/hooks/useProductTour";
@@ -40,11 +40,8 @@ import ClientDetail from "./pages/ClientDetail";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Install from "./pages/Install";
 import NotificationSettings from "./pages/NotificationSettings";
-import Goals from "./pages/Goals";
 import RegisterByInvite from "./pages/RegisterByInvite";
 import PublicClientReport from "./pages/PublicClientReport";
-import NPSPage from "./pages/NPSPage";
-import PublicNPSSurvey from "./pages/PublicNPSSurvey";
 import PublicApproval from "./pages/PublicApproval";
 import EmailMarketing from "./pages/EmailMarketing";
 
@@ -99,7 +96,6 @@ const App = () => (
                         <Route path="/onboarding" element={<Onboarding />} />
                         <Route path="/register" element={<RegisterByInvite />} />
                         <Route path="/report/:token" element={<PublicClientReport />} />
-                        <Route path="/nps-survey" element={<PublicNPSSurvey />} />
                         <Route path="/approve/:token" element={<PublicApproval />} />
                         
                         <Route path="/subscription-success" element={<SubscriptionSuccess />} />
@@ -119,8 +115,6 @@ const App = () => (
                           <Route path="crm" element={<RequirePermission permission="canAccessCRM"><CRM /></RequirePermission>} />
                           <Route path="agenda" element={<RequirePermission permission="canAccessAgenda"><Agenda /></RequirePermission>} />
                           <Route path="traffic" element={<RequirePermission permission="canAccessTraffic"><Traffic /></RequirePermission>} />
-                          <Route path="goals" element={<RequirePermission permission="canAccessGoals"><Goals /></RequirePermission>} />
-                          <Route path="nps" element={<Navigate to="/dashboard/goals?tab=nps" replace />} />
                           <Route path="admin" element={<RequirePermission permission="canAccessFinancial"><Admin /></RequirePermission>} />
                           <Route path="contracts" element={<RequirePermission permission="canAccessContracts"><Contracts /></RequirePermission>} />
                           <Route path="social-media" element={<RequirePermission permission="canAccessSocialMedia"><SocialMedia /></RequirePermission>} />

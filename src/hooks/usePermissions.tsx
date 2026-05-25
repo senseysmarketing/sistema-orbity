@@ -17,8 +17,6 @@ export interface PermissionsResult {
   canAccessTraffic: boolean;
   canAccessContracts: boolean;
   canAccessEmailMarketing: boolean;
-  canAccessNPS: boolean;
-  canAccessGoals: boolean;
   canAccessFinancial: boolean;
   canAccessReports: boolean;
   canAccessImport: boolean;
@@ -28,7 +26,7 @@ export interface PermissionsResult {
 const ALL_TRUE: AppPermissions = {
   clients: true, tasks: true, reminders: true, agenda: true, crm: true,
   social_media: true, traffic: true, contracts: true, email_marketing: true,
-  nps: true, goals: true, financial: true, reports: true, import_data: true,
+  financial: true, reports: true, import_data: true,
 };
 
 export function usePermissions(): PermissionsResult {
@@ -74,8 +72,6 @@ export function usePermissions(): PermissionsResult {
       canAccessTraffic: true,
       canAccessContracts: true,
       canAccessEmailMarketing: true,
-      canAccessNPS: true,
-      canAccessGoals: true,
       canAccessFinancial: true,
       canAccessReports: true,
       canAccessImport: true,
@@ -100,8 +96,6 @@ export function usePermissions(): PermissionsResult {
     traffic:      raw.traffic      ?? DEFAULT_PERMISSIONS.traffic,
     contracts:    raw.contracts    ?? raw.financial ?? DEFAULT_PERMISSIONS.contracts,
     email_marketing: raw.email_marketing ?? DEFAULT_PERMISSIONS.email_marketing,
-    nps:          raw.nps          ?? raw.crm ?? DEFAULT_PERMISSIONS.nps,
-    goals:        raw.goals        ?? raw.financial ?? DEFAULT_PERMISSIONS.goals,
     financial:    raw.financial    ?? DEFAULT_PERMISSIONS.financial,
     reports:      raw.reports      ?? DEFAULT_PERMISSIONS.reports,
     import_data:  raw.import_data  ?? DEFAULT_PERMISSIONS.import_data,
@@ -120,8 +114,6 @@ export function usePermissions(): PermissionsResult {
     canAccessTraffic: !!perms.traffic,
     canAccessContracts: !!perms.contracts,
     canAccessEmailMarketing: !!perms.email_marketing,
-    canAccessNPS: !!perms.nps,
-    canAccessGoals: !!perms.goals,
     canAccessFinancial: !!perms.financial,
     canAccessReports: !!perms.reports,
     canAccessImport: !!perms.import_data,

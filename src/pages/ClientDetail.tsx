@@ -86,7 +86,7 @@ export default function ClientDetail() {
     queryFn: async () => {
       if (!id || !currentAgency?.id) return null;
 
-        const [tasksResult, meetingsResult, credentialsResult, npsResult] = await Promise.all([
+        const [tasksResult, meetingsResult, credentialsResult] = await Promise.all([
         supabase
           .from("task_clients")
           .select("tasks!inner(id, title, status, priority, due_date)")
@@ -105,12 +105,6 @@ export default function ClientDetail() {
           .select("id, platform, username, password, url")
           .eq("client_id", id)
           .eq("agency_id", currentAgency.id),
-        supabase
-          .from("nps_responses")
-          .select("score, client_name, client_id")
-          .eq("agency_id", currentAgency.id)
-          .order("response_date", { ascending: false })
-          .limit(50),
       ]);
 
       const tasks = (tasksResult.data || []).map((r: any) => r.tasks).filter(Boolean);
@@ -122,10 +116,7 @@ export default function ClientDetail() {
 
       const credentials = credentialsResult.data || [];
 
-      // Match NPS by client name (nps_responses has client_name, not client_id)
-      const allNps = npsResult.data || [];
-
-      return { tasks, meetings, credentials, allNps };
+      return { tasks, meetings, credentials };
     },
     enabled: !!id && !!currentAgency?.id,
     staleTime: 3 * 60 * 1000,
@@ -286,9 +277,7 @@ export default function ClientDetail() {
   const tasks = dashboardData?.tasks || [];
   const meetings = dashboardData?.meetings || [];
   const credentials = dashboardData?.credentials || [];
-  const allNps = dashboardData?.allNps || [];
-  const matchedNps = allNps.find((n: any) => n.client_id === client.id) || allNps.find((n: any) => n.client_name === client.name);
-  const npsScore = matchedNps?.score ?? undefined;
+  const npsScore: number | undefined = undefined;
   const monthsActive = client.start_date ? differenceInMonths(new Date(), new Date(client.start_date)) : 0;
 
   const displayedTasks = tasks.slice(0, 5);
