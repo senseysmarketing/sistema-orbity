@@ -470,6 +470,7 @@ function BuilderDialog({
   open,
   draft,
   isSaving,
+  importWarnings,
   onOpenChange,
   onDraftChange,
   onSave,
@@ -477,6 +478,7 @@ function BuilderDialog({
   open: boolean;
   draft: AutomationFlowDraft;
   isSaving: boolean;
+  importWarnings?: string[];
   onOpenChange: (open: boolean) => void;
   onDraftChange: (draft: AutomationFlowDraft) => void;
   onSave: () => void;
