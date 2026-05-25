@@ -51,6 +51,21 @@ function normalizeSteps(steps: AutomationStepDraft[]) {
   }));
 }
 
+function validateScheduleWindow(triggerConfig: Record<string, unknown>) {
+  const schedule = triggerConfig.schedule_window as Record<string, unknown> | undefined;
+  if (!schedule || schedule.enabled !== true) return;
+
+  const days = Array.isArray(schedule.days) ? schedule.days : [];
+  if (days.length === 0) throw new Error("Selecione ao menos um dia permitido para envio.");
+
+  const start = String(schedule.start_time || "08:00");
+  const end = String(schedule.end_time || "17:00");
+  if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) {
+    throw new Error("Informe horarios validos para a janela de envio.");
+  }
+  if (start >= end) throw new Error("O horario final deve ser maior que o inicial.");
+}
+
 async function stopActiveExecutions(flowId: string, agencyId: string, reason: string) {
   const timestamp = new Date().toISOString();
 
@@ -106,6 +121,7 @@ export function useWhatsAppAutomationFlows() {
       if (!draft.name.trim()) throw new Error("Informe o nome da automacao.");
       if (!draft.trigger_type) throw new Error("Selecione um gatilho.");
       if (draft.steps.length === 0) throw new Error("Adicione ao menos um bloco.");
+      validateScheduleWindow(draft.trigger_config || {});
 
       const flowPayload = {
         agency_id: agencyId,

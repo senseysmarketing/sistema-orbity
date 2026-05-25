@@ -138,6 +138,35 @@ const VARIABLES = [
   "{data_reuniao}",
 ];
 
+const WEEK_DAYS = [
+  { value: "monday", label: "Seg" },
+  { value: "tuesday", label: "Ter" },
+  { value: "wednesday", label: "Qua" },
+  { value: "thursday", label: "Qui" },
+  { value: "friday", label: "Sex" },
+  { value: "saturday", label: "Sab" },
+  { value: "sunday", label: "Dom" },
+];
+
+const TIMEZONES = [
+  "America/Sao_Paulo",
+  "America/Manaus",
+  "America/Cuiaba",
+  "America/Fortaleza",
+  "America/Recife",
+  "America/Bahia",
+  "UTC",
+];
+
+const DEFAULT_SCHEDULE_WINDOW = {
+  enabled: false,
+  timezone: "America/Sao_Paulo",
+  days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+  start_time: "08:00",
+  end_time: "17:00",
+  outside_window_behavior: "schedule_next_available",
+};
+
 function triggerLabel(value: string) {
   return TRIGGERS.find((trigger) => trigger.value === value)?.label || value;
 }
@@ -199,7 +228,7 @@ function defaultDraft(): AutomationFlowDraft {
     description: "",
     status: "inactive",
     trigger_type: "lead_created",
-    trigger_config: {},
+    trigger_config: { schedule_window: DEFAULT_SCHEDULE_WINDOW },
     stop_rules: {
       stop_on_reply: true,
       stop_on_final_status: true,
@@ -460,6 +489,27 @@ function BuilderDialog({
   };
 
   const triggerConfig = draft.trigger_config || {};
+  const scheduleWindow = {
+    ...DEFAULT_SCHEDULE_WINDOW,
+    ...((triggerConfig.schedule_window as Record<string, unknown>) || {}),
+  };
+  const scheduleDays = Array.isArray(scheduleWindow.days) ? scheduleWindow.days.map(String) : DEFAULT_SCHEDULE_WINDOW.days;
+  const setTriggerConfig = (next: Record<string, unknown>) => {
+    onDraftChange({ ...draft, trigger_config: { ...triggerConfig, ...next } });
+  };
+  const setScheduleWindow = (next: Record<string, unknown>) => {
+    setTriggerConfig({
+      schedule_window: {
+        ...scheduleWindow,
+        ...next,
+        outside_window_behavior: "schedule_next_available",
+      },
+    });
+  };
+  const toggleScheduleDay = (day: string, checked: boolean) => {
+    const days = checked ? Array.from(new Set([...scheduleDays, day])) : scheduleDays.filter((item) => item !== day);
+    setScheduleWindow({ days });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -503,11 +553,82 @@ function BuilderDialog({
                 <Label>Palavra-chave</Label>
                 <Input
                   value={String(triggerConfig.keyword || "")}
-                  onChange={(event) => onDraftChange({ ...draft, trigger_config: { ...triggerConfig, keyword: event.target.value } })}
+                  onChange={(event) => setTriggerConfig({ keyword: event.target.value })}
                   placeholder="ex: orçamento"
                 />
               </div>
             )}
+            <div className="rounded-lg border bg-background p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">Horarios de envio</div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Se um lead entrar fora desse horario, a automacao sera iniciada automaticamente no proximo horario permitido.
+                  </p>
+                </div>
+                <Switch
+                  checked={scheduleWindow.enabled === true}
+                  onCheckedChange={(checked) => setScheduleWindow({ enabled: checked })}
+                />
+              </div>
+
+              {scheduleWindow.enabled === true && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Inicio</Label>
+                      <Input
+                        type="time"
+                        value={String(scheduleWindow.start_time || "08:00")}
+                        onChange={(event) => setScheduleWindow({ start_time: event.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Fim</Label>
+                      <Input
+                        type="time"
+                        value={String(scheduleWindow.end_time || "17:00")}
+                        onChange={(event) => setScheduleWindow({ end_time: event.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Timezone</Label>
+                    <Select
+                      value={String(scheduleWindow.timezone || "America/Sao_Paulo")}
+                      onValueChange={(value) => setScheduleWindow({ timezone: value })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TIMEZONES.map((timezone) => (
+                          <SelectItem key={timezone} value={timezone}>{timezone}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Dias permitidos</Label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {WEEK_DAYS.map((day) => {
+                        const checked = scheduleDays.includes(day.value);
+                        return (
+                          <Button
+                            key={day.value}
+                            type="button"
+                            variant={checked ? "default" : "outline"}
+                            size="sm"
+                            className="h-8 px-2 text-xs"
+                            onClick={() => toggleScheduleDay(day.value, !checked)}
+                          >
+                            {day.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="rounded-lg border bg-muted/30 p-4">
               <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
                 <Bell className="h-4 w-4 text-primary" />
