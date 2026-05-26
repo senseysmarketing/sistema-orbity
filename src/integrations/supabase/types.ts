@@ -8288,10 +8288,6 @@ export type Database = {
       is_master_agency_admin: { Args: never; Returns: boolean }
       is_master_user: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
-      mark_ppr_periods_stale_by_date: {
-        Args: { p_agency_id: string; p_date: string }
-        Returns: undefined
-      }
       master_get_agency_details: {
         Args: { p_agency_id: string }
         Returns: Json
