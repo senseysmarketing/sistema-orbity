@@ -109,7 +109,16 @@ async function reconcileAgency(s: AgencySettings) {
       const parsed = parseConexaPayload(detail);
 
       if (parsed.kind !== "settled" && parsed.kind !== "cancelled") {
-        // Cobrança ainda pendente na Conexa — nada a fazer
+        // Cobrança ainda pendente na Conexa — registra mesmo assim para auditoria
+        await logConexaWebhook(supabase, {
+          agencyId: s.agency_id,
+          paymentId: p.id,
+          source: "reconcile_cron",
+          rawBody: detail,
+          parsedChargeId: parsed.kind === "unknown_event" ? parsed.chargeId : null,
+          parsedEvent: parsed.kind,
+          matchStatus: "cron_no_change",
+        });
         summary.no_change += 1;
         continue;
       }
