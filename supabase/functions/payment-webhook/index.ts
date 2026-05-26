@@ -1,11 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import {
+  applyConexaPaymentUpdate,
+  enqueuePaidNotification,
+  logConexaWebhook,
+  parseConexaPayload,
+} from "../_shared/conexa-payment-update.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-// Event mapping
 const ASAAS_EVENT_MAP: Record<string, string> = {
   PAYMENT_RECEIVED: "paid",
   PAYMENT_CONFIRMED: "paid",
@@ -13,152 +18,177 @@ const ASAAS_EVENT_MAP: Record<string, string> = {
   PAYMENT_DELETED: "cancelled",
 };
 
-const CONEXA_EVENT_MAP: Record<string, string> = {
-  "__conexa_settled": "paid",
-  "__conexa_cancelled": "cancelled",
-};
-
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { status: 200 });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { status: 200 });
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
-  if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
-  }
-
+  let url: URL;
   try {
-    const url = new URL(req.url);
-    const gateway = url.searchParams.get("gateway");
-    const agencyId = url.searchParams.get("agency_id");
+    url = new URL(req.url);
+  } catch {
+    return new Response("Bad request", { status: 400 });
+  }
 
-    if (!gateway || !agencyId) {
-      return new Response(
-        JSON.stringify({ error: "Missing gateway or agency_id" }),
-        { status: 400 }
+  const gateway = url.searchParams.get("gateway");
+  const agencyId = url.searchParams.get("agency_id");
+
+  if (!gateway || !agencyId) {
+    return new Response(JSON.stringify({ error: "Missing gateway or agency_id" }), { status: 400 });
+  }
+  if (!["asaas", "conexa"].includes(gateway)) {
+    return new Response(JSON.stringify({ error: "Invalid gateway" }), { status: 400 });
+  }
+
+  // ===== CONEXA: PARSER TOLERANTE + AUDITORIA PERSISTIDA =====
+  if (gateway === "conexa") {
+    // 1. Ler body cru imediatamente (antes de qualquer validação) para auditoria.
+    let rawText = "";
+    let rawBody: unknown = null;
+    try {
+      rawText = await req.text();
+      rawBody = rawText ? JSON.parse(rawText) : null;
+    } catch (err) {
+      await logConexaWebhook(supabase, {
+        agencyId,
+        source: "webhook",
+        rawBody: { _raw_text: rawText.slice(0, 4000) },
+        matchStatus: "invalid_payload",
+        errorMessage: `json_parse_error: ${(err as Error).message}`,
+      });
+      return new Response("OK", { status: 200 });
+    }
+
+    // 2. Validar secret
+    const { data: settings } = await supabase
+      .from("agency_payment_settings")
+      .select("conexa_webhook_token")
+      .eq("agency_id", agencyId)
+      .maybeSingle();
+
+    const expectedToken = settings?.conexa_webhook_token;
+    const receivedSecret = url.searchParams.get("secret");
+    if (!expectedToken || receivedSecret !== expectedToken) {
+      await logConexaWebhook(supabase, {
+        agencyId,
+        source: "webhook",
+        rawBody,
+        matchStatus: "unauthorized",
+        errorMessage: "invalid_or_missing_secret",
+      });
+      console.warn(`[payment-webhook] Invalid Conexa secret for agency ${agencyId}`);
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    // 3. Parser tolerante
+    const parsed = parseConexaPayload(rawBody);
+
+    if (parsed.kind === "invalid_payload") {
+      await logConexaWebhook(supabase, {
+        agencyId,
+        source: "webhook",
+        rawBody,
+        parsedEvent: "invalid_payload",
+        matchStatus: "invalid_payload",
+        errorMessage: parsed.reason,
+      });
+      return new Response("OK", { status: 200 });
+    }
+
+    if (parsed.kind === "unknown_event") {
+      await logConexaWebhook(supabase, {
+        agencyId,
+        source: "webhook",
+        rawBody,
+        parsedChargeId: parsed.chargeId,
+        parsedEvent: "unknown_event",
+        matchStatus: "unknown_event",
+      });
+      return new Response("OK", { status: 200 });
+    }
+
+    // 4. Aplicar update
+    const result = await applyConexaPaymentUpdate(supabase, parsed, { agencyIdHint: agencyId });
+
+    await logConexaWebhook(supabase, {
+      agencyId,
+      paymentId: result.paymentId ?? null,
+      source: "webhook",
+      rawBody,
+      parsedChargeId: parsed.chargeId,
+      parsedEvent: parsed.kind,
+      matchStatus: result.status,
+      errorMessage: result.errorMessage ?? null,
+    });
+
+    if (result.status === "matched_and_updated" && result.newStatus === "paid" && result.agencyId) {
+      await enqueuePaidNotification(
+        supabase,
+        result.agencyId,
+        result.clientId ?? null,
+        result.paymentId!,
+        parsed.kind === "settled" ? parsed.paidAmount : 0,
       );
     }
 
-    if (!["asaas", "conexa"].includes(gateway)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid gateway" }),
-        { status: 400 }
-      );
-    }
+    return new Response("OK", { status: 200 });
+  }
 
-    // 1. Fetch agency payment settings for token validation
+  // ===== ASAAS: mantém comportamento original =====
+  try {
     const { data: settings, error: settingsError } = await supabase
       .from("agency_payment_settings")
-      .select("asaas_webhook_token, conexa_webhook_token")
+      .select("asaas_webhook_token")
       .eq("agency_id", agencyId)
       .maybeSingle();
 
     if (settingsError || !settings) {
-      console.error("Settings lookup failed:", settingsError?.message);
       return new Response("Agency not found", { status: 404 });
     }
 
-    // 2. Validate webhook token
-    if (gateway === "asaas") {
-      const expectedToken = settings.asaas_webhook_token;
-      const receivedToken = req.headers.get("asaas-access-token");
-      if (!expectedToken || receivedToken !== expectedToken) {
-        console.warn(`[payment-webhook] Invalid Asaas token for agency ${agencyId}`);
-        return new Response("Unauthorized", { status: 401 });
-      }
-    } else {
-      const expectedToken = settings.conexa_webhook_token;
-      const receivedSecret = url.searchParams.get("secret");
-      if (!expectedToken || receivedSecret !== expectedToken) {
-        console.warn(`[payment-webhook] Invalid Conexa secret for agency ${agencyId}`);
-        return new Response("Unauthorized", { status: 401 });
-      }
+    const expectedToken = settings.asaas_webhook_token;
+    const receivedToken = req.headers.get("asaas-access-token");
+    if (!expectedToken || receivedToken !== expectedToken) {
+      console.warn(`[payment-webhook] Invalid Asaas token for agency ${agencyId}`);
+      return new Response("Unauthorized", { status: 401 });
     }
 
-    // 3. Parse payload
     const body = await req.json();
-    let eventName: string;
-    let paymentExternalId: string;
-    let value: number;
-    let netValue: number;
-    let lookupColumn: string;
-
-    if (gateway === "asaas") {
-      eventName = body.event;
-      paymentExternalId = body.payment?.id;
-      value = body.payment?.value ?? 0;
-      netValue = body.payment?.netValue ?? value;
-      lookupColumn = "asaas_payment_id";
-    } else {
-      // Conexa sends flat JSON payloads (no event/data wrappers)
-      const chargeId = body.chargeId || body.id;
-      paymentExternalId = chargeId ? String(chargeId) : "";
-      lookupColumn = "conexa_charge_id";
-
-      if (body.paidAmount && body.paymentDate) {
-        // Quitação (settlement)
-        eventName = "__conexa_settled";
-        value = body.paidAmount ?? 0;
-        netValue = value; // Conexa doesn't provide net value in webhook
-      } else if (body.status === "cancelled" || body.status === "excluded") {
-        // Cancelamento
-        eventName = "__conexa_cancelled";
-        value = body.amount ?? 0;
-        netValue = value;
-      } else {
-        eventName = body.event || body.status || "";
-        value = body.amount ?? 0;
-        netValue = value;
-      }
-    }
+    const eventName: string = body.event;
+    const paymentExternalId: string = body.payment?.id;
+    const value: number = body.payment?.value ?? 0;
+    const netValue: number = body.payment?.netValue ?? value;
 
     if (!eventName || !paymentExternalId) {
-      console.warn("[payment-webhook] Missing event or payment ID in payload");
+      console.warn("[payment-webhook] Asaas: missing event or payment id");
       return new Response("OK", { status: 200 });
     }
 
-    // 4. Map event to status
-    const eventMap = gateway === "asaas" ? ASAAS_EVENT_MAP : CONEXA_EVENT_MAP;
-    const newStatus = eventMap[eventName];
-
+    const newStatus = ASAAS_EVENT_MAP[eventName];
     if (!newStatus) {
-      // Unknown event — acknowledge silently
-      console.log(`[payment-webhook] Ignoring unknown event: ${eventName}`);
+      console.log(`[payment-webhook] Asaas: ignoring event ${eventName}`);
       return new Response("OK", { status: 200 });
     }
 
-    // 5. Fetch current payment (idempotency check)
     const { data: payment, error: paymentError } = await supabase
       .from("client_payments")
       .select("id, status, agency_id, client_id, amount")
-      .eq(lookupColumn, paymentExternalId)
+      .eq("asaas_payment_id", paymentExternalId)
       .maybeSingle();
 
     if (paymentError || !payment) {
-      console.warn(`[payment-webhook] Payment not found for ${lookupColumn}=${paymentExternalId}`);
+      console.warn(`[payment-webhook] Asaas payment not found: ${paymentExternalId}`);
       return new Response("OK", { status: 200 });
     }
 
-    // Idempotency: if already in target status, skip
     if (payment.status === newStatus) {
-      console.log(`[payment-webhook] Already processed: ${payment.id} is ${newStatus}`);
       return new Response("Already processed", { status: 200 });
     }
 
-    // 6. Update payment
     const updateData: Record<string, unknown> = { status: newStatus };
-
     if (newStatus === "paid") {
       updateData.amount_paid = value;
       updateData.gateway_fee = Math.round((value - netValue) * 100) / 100;
-
-      let paidTimestamp: string;
-      if (gateway === "conexa") {
-        paidTimestamp = body.paymentOperationDate || body.paymentDate || new Date().toISOString();
-      } else {
-        paidTimestamp = body.payment?.paymentDate || new Date().toISOString();
-      }
-
+      const paidTimestamp = body.payment?.paymentDate || new Date().toISOString();
       updateData.paid_at = paidTimestamp;
       updateData.paid_date = paidTimestamp.split("T")[0];
     }
@@ -169,58 +199,23 @@ Deno.serve(async (req) => {
       .eq("id", payment.id);
 
     if (updateError) {
-      console.error(`[payment-webhook] Update failed for payment ${payment.id}:`, updateError.message);
+      console.error(`[payment-webhook] Asaas update failed for ${payment.id}:`, updateError.message);
       return new Response("OK", { status: 200 });
     }
 
-    console.log(`[payment-webhook] Payment ${payment.id} updated to ${newStatus}`);
-
-    // 7. Enqueue notification for PAYMENT_RECEIVED
     if (newStatus === "paid") {
-      // Find agency owner
-      const { data: owner } = await supabase
-        .from("agency_users")
-        .select("user_id")
-        .eq("agency_id", payment.agency_id)
-        .eq("role", "owner")
-        .maybeSingle();
-
-      if (owner?.user_id) {
-        // Get client name for the notification
-        const { data: client } = await supabase
-          .from("clients")
-          .select("name")
-          .eq("id", payment.client_id)
-          .maybeSingle();
-
-        const clientName = client?.name ?? "Cliente";
-        const formattedAmount = new Intl.NumberFormat("pt-BR", {
-          style: "currency",
-          currency: "BRL",
-        }).format(value);
-
-        await supabase.from("notification_queue").insert({
-          agency_id: payment.agency_id,
-          user_id: owner.user_id,
-          channel: "in_app",
-          payload: {
-            title: "Pagamento Recebido! 🎉",
-            body: `${clientName} pagou ${formattedAmount} via ${gateway === "asaas" ? "Asaas" : "Conexa"}.`,
-            type: "payment",
-            action_url: "/dashboard/admin",
-            payment_id: payment.id,
-            gateway,
-          },
-        });
-
-        console.log(`[payment-webhook] Notification enqueued for owner ${owner.user_id}`);
-      }
+      await enqueuePaidNotification(
+        supabase,
+        payment.agency_id,
+        payment.client_id,
+        payment.id,
+        value,
+      );
     }
 
     return new Response("OK", { status: 200 });
   } catch (err) {
-    console.error("[payment-webhook] Unexpected error:", err);
-    // Always return 200 to prevent gateway retries
+    console.error("[payment-webhook] Asaas unexpected error:", err);
     return new Response("OK", { status: 200 });
   }
 });

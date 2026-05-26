@@ -2205,6 +2205,56 @@ export type Database = {
           },
         ]
       }
+      conexa_webhook_log: {
+        Row: {
+          agency_id: string | null
+          error_message: string | null
+          headers: Json | null
+          id: string
+          match_status: string
+          parsed_charge_id: string | null
+          parsed_event: string | null
+          payment_id: string | null
+          raw_body: Json | null
+          received_at: string
+          source: string
+        }
+        Insert: {
+          agency_id?: string | null
+          error_message?: string | null
+          headers?: Json | null
+          id?: string
+          match_status: string
+          parsed_charge_id?: string | null
+          parsed_event?: string | null
+          payment_id?: string | null
+          raw_body?: Json | null
+          received_at?: string
+          source?: string
+        }
+        Update: {
+          agency_id?: string | null
+          error_message?: string | null
+          headers?: Json | null
+          id?: string
+          match_status?: string
+          parsed_charge_id?: string | null
+          parsed_event?: string | null
+          payment_id?: string | null
+          raw_body?: Json | null
+          received_at?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conexa_webhook_log_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "client_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_library: {
         Row: {
           agency_id: string
@@ -8148,6 +8198,7 @@ export type Database = {
         Args: { p_agency_id: string; p_type: string; p_user_id: string }
         Returns: boolean
       }
+      cleanup_conexa_webhook_log: { Args: never; Returns: undefined }
       cleanup_old_notification_tracking: { Args: never; Returns: undefined }
       complete_fast_track: { Args: { agency_uuid: string }; Returns: boolean }
       delete_agency_cascade: {
