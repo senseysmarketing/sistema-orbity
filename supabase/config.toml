@@ -72,3 +72,6 @@ verify_jwt = false
 
 [functions.storage-garbage-collector]
 verify_jwt = false
+
+[functions.reconcile-conexa-payments]
+verify_jwt = false
