@@ -509,6 +509,9 @@ Deno.serve(async (req) => {
               conexa_billing_status = "billet_available";
             } else if (autoBillet) {
               conexa_billing_status = "charge_created_without_billet";
+              return jsonResponse({
+                error: `Conexa criou a cobrança ${chargeId}, mas o boleto Efí não foi gerado. Isso geralmente acontece quando o Meio de Faturamento selecionado não está corretamente vinculado ao Efí no painel do Conexa, ou quando o ID do Meio de Faturamento está ausente. Vá em Configurações → Integrações → Conexa, clique em 'Buscar meios de faturamento' e selecione novamente o meio Boleto Efí antes de salvar.`,
+              }, 422);
             }
 
             // Pix opcional
