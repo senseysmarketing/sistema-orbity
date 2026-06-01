@@ -264,6 +264,8 @@ export async function createConexaCharge(
   if (input.notes) body.notes = input.notes;
   if (input.invoicingMethodId) body.invoicingMethodId = input.invoicingMethodId;
 
+  console.log("[Conexa] POST /charge body:", JSON.stringify(body));
+
   const res = await conexaRequest<any>(creds, "/charge", { method: "POST", body });
 
   await logConexaApi(supabase, {
