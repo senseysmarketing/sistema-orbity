@@ -1,4 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import {
+  createConexaCharge as sharedCreateConexaCharge,
+  getConexaCharge,
+  getConexaPix,
+  validateInvoicingMethod,
+  logConexaApi,
+  type ConexaCreds,
+} from "../_shared/conexa-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
