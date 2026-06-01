@@ -354,6 +354,86 @@ export function ConexaIntegration() {
 
         <Separator />
 
+        {/* Boleto / Meio de Faturamento */}
+        <div className="space-y-3 rounded-lg border p-4">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-sm font-medium">Boleto / Meio de Faturamento</Label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Selecione um meio de faturamento do tipo <strong>Boleto</strong> (ex.: Boleto
+            Gerencianet/Efí) cadastrado na sua conta Conexa. Sem isso, o boleto não nasce automaticamente.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleFetchInvoicingMethods}
+              disabled={loadingMethods}
+            >
+              {loadingMethods ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Buscar meios de faturamento
+            </Button>
+            {invoicingMethodName && (
+              <Badge variant="secondary" className="self-center">
+                Atual: {invoicingMethodName} ({invoicingMethodType || "?"})
+              </Badge>
+            )}
+          </div>
+
+          {invoicingMethods.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="conexa-invoicing-method">Selecione o meio</Label>
+              <Select value={invoicingMethodId} onValueChange={handleSelectInvoicingMethod}>
+                <SelectTrigger id="conexa-invoicing-method">
+                  <SelectValue placeholder="Escolha um meio de faturamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {invoicingMethods.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.name} — {m.type} {m.isActive ? "" : "(inativo)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <div className="space-y-0.5 pr-3">
+              <Label htmlFor="conexa-auto-billet" className="text-sm font-medium cursor-pointer">
+                Gerar boleto automaticamente ao faturar
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Envia <code>invoicingMethodId</code> no POST /charge. Exige meio do tipo <strong>billet</strong> ativo.
+              </p>
+            </div>
+            <Switch
+              id="conexa-auto-billet"
+              checked={autoGenerateBillet}
+              onCheckedChange={setAutoGenerateBillet}
+            />
+          </div>
+
+          {autoGenerateBillet && !invoicingMethodId && (
+            <Alert variant="destructive">
+              <AlertDescription className="text-xs">
+                Selecione um meio de faturamento antes de salvar com a auto-geração ativa.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        <Separator />
+
+
+
         {/* Chave de Segurança do Webhook - Auto-gerada */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
