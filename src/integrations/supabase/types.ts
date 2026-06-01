@@ -630,10 +630,14 @@ export type Database = {
           block_access_enabled: boolean | null
           conexa_account_id: number | null
           conexa_api_key: string | null
+          conexa_auto_generate_billet: boolean
           conexa_billing_enabled: boolean | null
           conexa_company_id: number | null
           conexa_default_product_id: number | null
           conexa_enabled: boolean | null
+          conexa_invoicing_method_id: number | null
+          conexa_invoicing_method_name: string | null
+          conexa_invoicing_method_type: string | null
           conexa_receiving_method_id: number | null
           conexa_subdomain: string | null
           conexa_template_overdue: string | null
@@ -676,10 +680,14 @@ export type Database = {
           block_access_enabled?: boolean | null
           conexa_account_id?: number | null
           conexa_api_key?: string | null
+          conexa_auto_generate_billet?: boolean
           conexa_billing_enabled?: boolean | null
           conexa_company_id?: number | null
           conexa_default_product_id?: number | null
           conexa_enabled?: boolean | null
+          conexa_invoicing_method_id?: number | null
+          conexa_invoicing_method_name?: string | null
+          conexa_invoicing_method_type?: string | null
           conexa_receiving_method_id?: number | null
           conexa_subdomain?: string | null
           conexa_template_overdue?: string | null
@@ -722,10 +730,14 @@ export type Database = {
           block_access_enabled?: boolean | null
           conexa_account_id?: number | null
           conexa_api_key?: string | null
+          conexa_auto_generate_billet?: boolean
           conexa_billing_enabled?: boolean | null
           conexa_company_id?: number | null
           conexa_default_product_id?: number | null
           conexa_enabled?: boolean | null
+          conexa_invoicing_method_id?: number | null
+          conexa_invoicing_method_name?: string | null
+          conexa_invoicing_method_type?: string | null
           conexa_receiving_method_id?: number | null
           conexa_subdomain?: string | null
           conexa_template_overdue?: string | null
@@ -1964,9 +1976,16 @@ export type Database = {
           asaas_payment_id: string | null
           billing_type: string | null
           client_id: string
+          conexa_billet_url: string | null
+          conexa_billing_status: string | null
           conexa_charge_id: string | null
+          conexa_charge_url: string | null
           conexa_invoice_url: string | null
+          conexa_last_sync_at: string | null
           conexa_pix_copy_paste: string | null
+          conexa_pix_qr_code: string | null
+          conexa_raw_charge: Json | null
+          conexa_sale_id: string | null
           created_at: string
           description: string | null
           due_date: string
@@ -1989,9 +2008,16 @@ export type Database = {
           asaas_payment_id?: string | null
           billing_type?: string | null
           client_id: string
+          conexa_billet_url?: string | null
+          conexa_billing_status?: string | null
           conexa_charge_id?: string | null
+          conexa_charge_url?: string | null
           conexa_invoice_url?: string | null
+          conexa_last_sync_at?: string | null
           conexa_pix_copy_paste?: string | null
+          conexa_pix_qr_code?: string | null
+          conexa_raw_charge?: Json | null
+          conexa_sale_id?: string | null
           created_at?: string
           description?: string | null
           due_date: string
@@ -2014,9 +2040,16 @@ export type Database = {
           asaas_payment_id?: string | null
           billing_type?: string | null
           client_id?: string
+          conexa_billet_url?: string | null
+          conexa_billing_status?: string | null
           conexa_charge_id?: string | null
+          conexa_charge_url?: string | null
           conexa_invoice_url?: string | null
+          conexa_last_sync_at?: string | null
           conexa_pix_copy_paste?: string | null
+          conexa_pix_qr_code?: string | null
+          conexa_raw_charge?: Json | null
+          conexa_sale_id?: string | null
           created_at?: string
           description?: string | null
           due_date?: string
@@ -2198,6 +2231,73 @@ export type Database = {
           },
           {
             foreignKeyName: "clients_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      conexa_api_logs: {
+        Row: {
+          agency_id: string | null
+          client_id: string | null
+          created_at: string
+          endpoint: string | null
+          error_message: string | null
+          http_status: number | null
+          id: string
+          operation: string
+          payment_id: string | null
+          request_payload: Json | null
+          response_payload: Json | null
+          success: boolean
+        }
+        Insert: {
+          agency_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          endpoint?: string | null
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          operation: string
+          payment_id?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          success?: boolean
+        }
+        Update: {
+          agency_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          endpoint?: string | null
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          operation?: string
+          payment_id?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conexa_api_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conexa_api_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "conexa_api_logs_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_usage"
