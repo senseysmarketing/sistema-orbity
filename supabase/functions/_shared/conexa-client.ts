@@ -179,13 +179,19 @@ export async function listInvoicingMethods(
   }
 
   const items = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
-  return (items as any[]).map((it) => ({
-    id: Number(it.id),
-    name: String(it.name ?? it.description ?? `#${it.id}`),
-    type: String(it.type ?? "others"),
-    isActive: it.isActive === true || it.isActive === 1 || it.isActive === "1",
-    companyId: it.companyId ?? null,
-  }));
+  return (items as any[])
+    .map((it) => {
+      const rawId = it.id ?? it.invoicingMethodId ?? it.invoicing_method_id;
+      const numId = Number(rawId);
+      return {
+        id: numId,
+        name: String(it.name ?? it.description ?? `#${rawId}`),
+        type: String(it.type ?? "others"),
+        isActive: it.isActive === true || it.isActive === 1 || it.isActive === "1",
+        companyId: it.companyId ?? null,
+      };
+    })
+    .filter((m) => Number.isFinite(m.id) && m.id > 0);
 }
 
 export async function validateInvoicingMethod(
