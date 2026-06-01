@@ -161,6 +161,12 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (autoBillet && !details.billetUrl) {
+      return jsonResponse({
+        error: `Conexa criou a cobrança ${chargeId}, mas o boleto Efí não foi gerado. Verifique no painel do Conexa se o Meio de Faturamento Boleto Efí está ativo e corretamente vinculado, e re-selecione o meio em Configurações → Integrações → Conexa.`,
+      }, 422);
+    }
+
     return jsonResponse({
       success: true,
       chargeId,

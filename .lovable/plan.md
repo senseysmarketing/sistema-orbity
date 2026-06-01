@@ -1,11 +1,18 @@
-## Causa
+Vou ajustar o fluxo Conexa para garantir que a cobrança seja criada com o meio de faturamento Efí correto e que o sistema valide o resultado antes de salvar como emitido.
 
-A função `conexa-list-invoicing-methods` **não foi deployada** — o `curl` retorna 404 `NOT_FOUND` e o painel não tem logs. Os arquivos existem no projeto e o `config.toml` registra a função, mas o deploy automático não rodou (ou falhou silenciosamente) quando criamos a função na sessão anterior. Por isso o navegador mostra "Failed to send a request to the Edge Function".
+Plano:
+1. Atualizar `create-gateway-charge` para tratar o boleto Efí como obrigatório quando `conexa_auto_generate_billet` estiver ativo:
+   - enviar o `conexa_invoicing_method_id` no `POST /charge`;
+   - registrar no log o corpo enviado para confirmar o `invoicingMethodId`;
+   - após criar a cobrança, buscar os detalhes e falhar com mensagem clara se o Conexa retornar cobrança sem `billetUrl`.
 
-## Plano
+2. Aplicar a mesma regra em `invoice-conexa-sale`, para o botão/manual de “Gerar Transação e Boleto”:
+   - validar o meio de faturamento configurado;
+   - criar cobrança com `invoicingMethodId`;
+   - não marcar como boleto disponível se o Efí não tiver gerado a transação.
 
-1. Fazer o deploy individual da função `conexa-list-invoicing-methods` via `supabase--deploy_edge_functions` (estratégia padrão do projeto, conforme memória "Deploy Estratégia").
-2. Revalidar com `curl` direto ao endpoint e confirmar `200` (ou pelo menos resposta JSON com lista de meios / erro de credencial — não mais 404).
-3. Se o deploy falhar, ler os logs retornados e ajustar imports/bundle conforme necessário.
+3. Tornar o cliente Conexa compartilhado mais tolerante à API real:
+   - aceitar variações de resposta para URL do boleto;
+   - melhorar a mensagem quando o Conexa cria fatura, mas não gera transação Efí.
 
-Nenhum código precisa mudar — só publicar o que já está no repo.
+4. Reimplantar as Edge Functions afetadas e validar pelos logs que o payload da cobrança contém o `invoicingMethodId` e que o erro muda de “Transação não gerada” para boleto/transação Efí disponível ou erro explicativo.
