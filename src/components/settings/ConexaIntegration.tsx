@@ -9,6 +9,13 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -19,10 +26,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Eye, EyeOff, Save, Loader2, Copy, Check, Webhook, RefreshCw, Info } from "lucide-react";
+import { Eye, EyeOff, Save, Loader2, Copy, Check, Webhook, RefreshCw, Info, FileText } from "lucide-react";
 import conexaLogo from "@/assets/conexa-logo.png";
 import { usePaymentGateway } from "@/hooks/usePaymentGateway";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 function generateRandomKey(length = 16): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -47,6 +55,17 @@ export function ConexaIntegration() {
   const [showKey, setShowKey] = useState(false);
   const [showWebhookToken, setShowWebhookToken] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Boleto / Meio de Faturamento
+  const [invoicingMethodId, setInvoicingMethodId] = useState<string>("");
+  const [invoicingMethodName, setInvoicingMethodName] = useState<string>("");
+  const [invoicingMethodType, setInvoicingMethodType] = useState<string>("");
+  const [autoGenerateBillet, setAutoGenerateBillet] = useState(false);
+  const [invoicingMethods, setInvoicingMethods] = useState<
+    Array<{ id: number; name: string; type: string; isActive: boolean }>
+  >([]);
+  const [loadingMethods, setLoadingMethods] = useState(false);
+
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -61,6 +80,14 @@ export function ConexaIntegration() {
       const existingToken = settings.conexa_webhook_token || "";
       setWebhookToken(existingToken || generateRandomKey());
       setGatewayActive(settings.conexa_enabled ?? false);
+      setInvoicingMethodId(
+        (settings as any).conexa_invoicing_method_id
+          ? String((settings as any).conexa_invoicing_method_id)
+          : "",
+      );
+      setInvoicingMethodName((settings as any).conexa_invoicing_method_name || "");
+      setInvoicingMethodType((settings as any).conexa_invoicing_method_type || "");
+      setAutoGenerateBillet((settings as any).conexa_auto_generate_billet === true);
       initialized.current = true;
     }
   }, [settings]);
@@ -83,7 +110,83 @@ export function ConexaIntegration() {
     toast({ title: "Nova chave gerada!", description: "Lembre-se de atualizar a URL no painel do Conexa." });
   };
 
+  const handleFetchInvoicingMethods = async () => {
+    if (!settings?.agency_id) {
+      toast({ title: "Agência não encontrada", variant: "destructive" });
+      return;
+    }
+    if (!apiKey || !subdomain) {
+      toast({
+        title: "Configure subdomínio e token primeiro",
+        description: "Salve o subdomínio e o token de acesso do Conexa antes de buscar os meios.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setLoadingMethods(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("conexa-list-invoicing-methods", {
+        body: { agency_id: settings.agency_id, type: "billet" },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      const methods = (data?.methods ?? []) as Array<{
+        id: number;
+        name: string;
+        type: string;
+        isActive: boolean;
+      }>;
+      setInvoicingMethods(methods);
+      if (methods.length === 0) {
+        toast({
+          title: "Nenhum meio de faturamento do tipo Boleto encontrado",
+          description: "Cadastre um Meio de Faturamento (ex.: Boleto Gerencianet/Efí) no painel Conexa.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: `${methods.length} meio(s) encontrado(s)` });
+      }
+    } catch (err) {
+      toast({
+        title: "Erro ao buscar meios de faturamento",
+        description: (err as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingMethods(false);
+    }
+  };
+
+  const handleSelectInvoicingMethod = (id: string) => {
+    setInvoicingMethodId(id);
+    const found = invoicingMethods.find((m) => String(m.id) === id);
+    if (found) {
+      setInvoicingMethodName(found.name);
+      setInvoicingMethodType(found.type);
+    }
+  };
+
   const handleSave = async () => {
+    // Validação: auto boleto requer meio do tipo billet
+    if (autoGenerateBillet) {
+      if (!invoicingMethodId) {
+        toast({
+          title: "Selecione um Meio de Faturamento",
+          description: "Auto-geração de boleto está ativa. Clique em 'Buscar meios de faturamento' e escolha um.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (invoicingMethodType && invoicingMethodType !== "billet") {
+        toast({
+          title: "Tipo inválido para boleto",
+          description: `O meio selecionado é "${invoicingMethodType}". Selecione um do tipo "billet".`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     try {
       await updateSettings({
         conexa_api_key: apiKey || null,
@@ -95,6 +198,10 @@ export function ConexaIntegration() {
         conexa_receiving_method_id: receivingMethodId ? parseInt(receivingMethodId, 10) : null,
         conexa_webhook_token: webhookToken || null,
         conexa_enabled: gatewayActive,
+        conexa_invoicing_method_id: invoicingMethodId ? parseInt(invoicingMethodId, 10) : null,
+        conexa_invoicing_method_name: invoicingMethodName || null,
+        conexa_invoicing_method_type: invoicingMethodType || null,
+        conexa_auto_generate_billet: autoGenerateBillet,
       } as any);
       toast({ title: "Configurações salvas!", description: gatewayActive ? "Conexa habilitado como gateway." : "Conexa desabilitado." });
     } catch {
@@ -246,6 +353,86 @@ export function ConexaIntegration() {
         </div>
 
         <Separator />
+
+        {/* Boleto / Meio de Faturamento */}
+        <div className="space-y-3 rounded-lg border p-4">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-sm font-medium">Boleto / Meio de Faturamento</Label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Selecione um meio de faturamento do tipo <strong>Boleto</strong> (ex.: Boleto
+            Gerencianet/Efí) cadastrado na sua conta Conexa. Sem isso, o boleto não nasce automaticamente.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleFetchInvoicingMethods}
+              disabled={loadingMethods}
+            >
+              {loadingMethods ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Buscar meios de faturamento
+            </Button>
+            {invoicingMethodName && (
+              <Badge variant="secondary" className="self-center">
+                Atual: {invoicingMethodName} ({invoicingMethodType || "?"})
+              </Badge>
+            )}
+          </div>
+
+          {invoicingMethods.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="conexa-invoicing-method">Selecione o meio</Label>
+              <Select value={invoicingMethodId} onValueChange={handleSelectInvoicingMethod}>
+                <SelectTrigger id="conexa-invoicing-method">
+                  <SelectValue placeholder="Escolha um meio de faturamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {invoicingMethods.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.name} — {m.type} {m.isActive ? "" : "(inativo)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <div className="space-y-0.5 pr-3">
+              <Label htmlFor="conexa-auto-billet" className="text-sm font-medium cursor-pointer">
+                Gerar boleto automaticamente ao faturar
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Envia <code>invoicingMethodId</code> no POST /charge. Exige meio do tipo <strong>billet</strong> ativo.
+              </p>
+            </div>
+            <Switch
+              id="conexa-auto-billet"
+              checked={autoGenerateBillet}
+              onCheckedChange={setAutoGenerateBillet}
+            />
+          </div>
+
+          {autoGenerateBillet && !invoicingMethodId && (
+            <Alert variant="destructive">
+              <AlertDescription className="text-xs">
+                Selecione um meio de faturamento antes de salvar com a auto-geração ativa.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        <Separator />
+
+
 
         {/* Chave de Segurança do Webhook - Auto-gerada */}
         <div className="space-y-2">
