@@ -106,6 +106,44 @@ async function reconcileAgency(s: AgencySettings) {
       }
 
       const detail = await res.json();
+
+      // Enriquecer cobrança: atualizar URLs/raw/last_sync_at independentemente do status
+      try {
+        const enrich: Record<string, unknown> = {
+          conexa_raw_charge: detail,
+          conexa_last_sync_at: new Date().toISOString(),
+        };
+        if (detail?.chargeUrl) {
+          enrich.conexa_charge_url = detail.chargeUrl;
+          enrich.conexa_invoice_url = detail.chargeUrl;
+        }
+        if (detail?.billetUrl) enrich.conexa_billet_url = detail.billetUrl;
+
+        // Tentar Pix apenas se ainda não temos copy/paste salvo
+        if (!(p as any).conexa_pix_copy_paste) {
+          try {
+            const pixRes = await fetchWithTimeout(
+              `${baseUrl}/charge/pix/${p.conexa_charge_id}`,
+              { method: "GET", headers: { Authorization: `Bearer ${s.conexa_api_key}` } },
+              FETCH_TIMEOUT_MS,
+            );
+            if (pixRes.ok) {
+              const pixData = await pixRes.json();
+              if (pixData?.copyPasteCode) enrich.conexa_pix_copy_paste = pixData.copyPasteCode;
+              if (pixData?.qrCode) enrich.conexa_pix_qr_code = pixData.qrCode;
+            } else {
+              await pixRes.text().catch(() => "");
+            }
+          } catch (_pixErr) {
+            // Pix opcional — silenciar
+          }
+        }
+
+        await supabase.from("client_payments").update(enrich).eq("id", p.id);
+      } catch (enrichErr) {
+        console.warn(`[reconcile-conexa] enrich failed for ${p.id}:`, (enrichErr as Error).message);
+      }
+
       const parsed = parseConexaPayload(detail);
 
       if (parsed.kind !== "settled" && parsed.kind !== "cancelled") {
