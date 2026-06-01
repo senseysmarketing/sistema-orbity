@@ -55,6 +55,17 @@ export function ConexaIntegration() {
   const [showKey, setShowKey] = useState(false);
   const [showWebhookToken, setShowWebhookToken] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Boleto / Meio de Faturamento
+  const [invoicingMethodId, setInvoicingMethodId] = useState<string>("");
+  const [invoicingMethodName, setInvoicingMethodName] = useState<string>("");
+  const [invoicingMethodType, setInvoicingMethodType] = useState<string>("");
+  const [autoGenerateBillet, setAutoGenerateBillet] = useState(false);
+  const [invoicingMethods, setInvoicingMethods] = useState<
+    Array<{ id: number; name: string; type: string; isActive: boolean }>
+  >([]);
+  const [loadingMethods, setLoadingMethods] = useState(false);
+
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -69,6 +80,14 @@ export function ConexaIntegration() {
       const existingToken = settings.conexa_webhook_token || "";
       setWebhookToken(existingToken || generateRandomKey());
       setGatewayActive(settings.conexa_enabled ?? false);
+      setInvoicingMethodId(
+        (settings as any).conexa_invoicing_method_id
+          ? String((settings as any).conexa_invoicing_method_id)
+          : "",
+      );
+      setInvoicingMethodName((settings as any).conexa_invoicing_method_name || "");
+      setInvoicingMethodType((settings as any).conexa_invoicing_method_type || "");
+      setAutoGenerateBillet((settings as any).conexa_auto_generate_billet === true);
       initialized.current = true;
     }
   }, [settings]);
