@@ -312,9 +312,16 @@ Deno.serve(async (req) => {
     let asaas_payment_id: string | null = null;
     let invoice_url: string | null = null;
     let pix_copy_paste: string | null = null;
+    let conexa_sale_id: string | null = null;
     let conexa_charge_id: string | null = null;
     let conexa_invoice_url: string | null = null;
+    let conexa_charge_url: string | null = null;
+    let conexa_billet_url: string | null = null;
     let conexa_pix_copy_paste: string | null = null;
+    let conexa_pix_qr_code: string | null = null;
+    let conexa_raw_charge: unknown = null;
+    let conexa_billing_status: string | null = null;
+    let conexa_last_sync_at: string | null = null;
     let gateway_fee: number | null = null;
 
     const effectiveBillingType = billing_type || "manual";
@@ -378,7 +385,29 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: "ID da Unidade do Conexa não configurado. Vá em Configurações > Integrações e preencha o campo 'ID da Unidade'." }, 422);
         }
 
+        // Se auto-boleto está ativo, validar meio de faturamento ANTES de criar venda
+        const autoBillet = settings.conexa_auto_generate_billet === true;
+        if (autoBillet && !settings.conexa_invoicing_method_id) {
+          return jsonResponse({
+            error: "Auto-geração de boleto está ativa, mas nenhum Meio de Faturamento foi selecionado. Vá em Configurações > Integrações > Conexa e clique em 'Buscar meios de faturamento'.",
+          }, 422);
+        }
+
         const conexaBaseUrl = `https://${settings.conexa_subdomain}.conexa.app/index.php/api/v2`;
+        const conexaCreds: ConexaCreds = { baseUrl: conexaBaseUrl, apiKey: settings.conexa_api_key };
+
+        if (autoBillet) {
+          try {
+            await validateInvoicingMethod(adminClient, conexaCreds, {
+              invoicingMethodId: settings.conexa_invoicing_method_id,
+              companyId: settings.conexa_company_id ?? settings.conexa_unit_id,
+              agencyId: agency_id,
+              expectedType: "billet",
+            });
+          } catch (err) {
+            return jsonResponse({ error: (err as Error).message }, 422);
+          }
+        }
 
         // Ensure customer exists in Conexa (uses unit_id as companyId)
         let conexaCustomerId = await ensureConexaCustomer(
@@ -411,7 +440,6 @@ Deno.serve(async (req) => {
               .update({ conexa_customer_id: null })
               .eq("id", client_id);
 
-            // Force re-creation by passing client with null conexa_customer_id
             conexaCustomerId = await ensureConexaCustomer(
               { ...client, conexa_customer_id: null },
               conexaBaseUrl,
@@ -435,24 +463,66 @@ Deno.serve(async (req) => {
           }
         }
 
-        // POST /sale returns { "id": 12345 } with status notBilled
+        // POST /sale returns { "id": 12345 } com status notBilled
         const saleId = conexaResponse.id ? String(conexaResponse.id) : null;
+        await logConexaApi(adminClient, {
+          agencyId: agency_id,
+          clientId: client_id,
+          operation: "sale_create",
+          endpoint: "/sale",
+          httpStatus: 200,
+          success: !!saleId,
+          responsePayload: conexaResponse,
+        });
 
-        if (saleId && shouldAutoInvoice) {
-          // Auto-invoice: create charge immediately
-          const chargeResult = await createConexaCharge(
-            saleId,
-            due_date,
-            description,
-            conexaBaseUrl,
-            settings.conexa_api_key
-          );
-          conexa_charge_id = chargeResult.chargeId;
-          conexa_invoice_url = chargeResult.chargeUrl;
-          conexa_pix_copy_paste = chargeResult.billetUrl;
-        } else {
-          // Save sale ID temporarily — will be overwritten when invoiced manually
-          conexa_charge_id = saleId;
+        if (saleId) {
+          conexa_sale_id = saleId;
+          conexa_billing_status = "sale_created";
+
+          if (shouldAutoInvoice) {
+            // Criar cobrança via /charge — com invoicingMethodId se auto-boleto ativo
+            const { chargeId, raw: chargeCreateRaw } = await sharedCreateConexaCharge(
+              adminClient,
+              conexaCreds,
+              {
+                saleId,
+                dueDate: due_date,
+                notes: description,
+                invoicingMethodId: autoBillet ? settings.conexa_invoicing_method_id : null,
+              },
+              { agencyId: agency_id, clientId: client_id },
+            );
+            conexa_charge_id = chargeId;
+            conexa_billing_status = "charge_created";
+
+            // Enriquecer com GET /charge/:id
+            const details = await getConexaCharge(adminClient, conexaCreds, chargeId, {
+              agencyId: agency_id,
+              clientId: client_id,
+            });
+            conexa_charge_url = details.chargeUrl;
+            conexa_invoice_url = details.chargeUrl; // legado
+            conexa_billet_url = details.billetUrl;
+            conexa_raw_charge = details.raw ?? chargeCreateRaw;
+
+            if (details.billetUrl) {
+              conexa_billing_status = "billet_available";
+            } else if (autoBillet) {
+              conexa_billing_status = "charge_created_without_billet";
+            }
+
+            // Pix opcional
+            const pix = await getConexaPix(adminClient, conexaCreds, chargeId, {
+              agencyId: agency_id,
+              clientId: client_id,
+            });
+            if (pix) {
+              conexa_pix_copy_paste = pix.copyPasteCode;
+              conexa_pix_qr_code = pix.qrCode;
+            }
+
+            conexa_last_sync_at = new Date().toISOString();
+          }
         }
       }
     }
@@ -470,9 +540,16 @@ Deno.serve(async (req) => {
       asaas_payment_id,
       invoice_url,
       pix_copy_paste,
+      conexa_sale_id,
       conexa_charge_id,
       conexa_invoice_url,
+      conexa_charge_url,
+      conexa_billet_url,
       conexa_pix_copy_paste,
+      conexa_pix_qr_code,
+      conexa_raw_charge,
+      conexa_billing_status,
+      conexa_last_sync_at,
       gateway_fee,
     };
 
