@@ -66,31 +66,35 @@ export function ConexaIntegration() {
   >([]);
   const [loadingMethods, setLoadingMethods] = useState(false);
 
-  const initialized = useRef(false);
+  const lastLoadedId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (settings && !initialized.current) {
-      setApiKey(settings.conexa_api_key || "");
-      setSubdomain(settings.conexa_subdomain || "");
-      setProductId(settings.conexa_default_product_id ? String(settings.conexa_default_product_id) : "");
-      setCompanyId(settings.conexa_company_id ? String(settings.conexa_company_id) : "");
-      setUnitId((settings as any).conexa_unit_id ? String((settings as any).conexa_unit_id) : "");
-      setAccountId((settings as any).conexa_account_id ? String((settings as any).conexa_account_id) : "");
-      setReceivingMethodId((settings as any).conexa_receiving_method_id ? String((settings as any).conexa_receiving_method_id) : "");
-      const existingToken = settings.conexa_webhook_token || "";
-      setWebhookToken(existingToken || generateRandomKey());
-      setGatewayActive(settings.conexa_enabled ?? false);
-      setInvoicingMethodId(
-        (settings as any).conexa_invoicing_method_id
-          ? String((settings as any).conexa_invoicing_method_id)
-          : "",
-      );
-      setInvoicingMethodName((settings as any).conexa_invoicing_method_name || "");
-      setInvoicingMethodType((settings as any).conexa_invoicing_method_type || "");
-      setAutoGenerateBillet((settings as any).conexa_auto_generate_billet === true);
-      initialized.current = true;
-    }
-  }, [settings]);
+    if (isLoading) return;
+    // Só hidrata quando temos uma linha real (id não-vazio) e ainda não carregamos essa linha.
+    // Evita que o `stableSettings` (defaults vazios) sobrescreva o formulário antes da query terminar.
+    if (!settings?.id) return;
+    if (lastLoadedId.current === settings.id) return;
+
+    setApiKey(settings.conexa_api_key || "");
+    setSubdomain(settings.conexa_subdomain || "");
+    setProductId(settings.conexa_default_product_id ? String(settings.conexa_default_product_id) : "");
+    setCompanyId(settings.conexa_company_id ? String(settings.conexa_company_id) : "");
+    setUnitId((settings as any).conexa_unit_id ? String((settings as any).conexa_unit_id) : "");
+    setAccountId((settings as any).conexa_account_id ? String((settings as any).conexa_account_id) : "");
+    setReceivingMethodId((settings as any).conexa_receiving_method_id ? String((settings as any).conexa_receiving_method_id) : "");
+    const existingToken = settings.conexa_webhook_token || "";
+    setWebhookToken(existingToken || generateRandomKey());
+    setGatewayActive(settings.conexa_enabled ?? false);
+    setInvoicingMethodId(
+      (settings as any).conexa_invoicing_method_id
+        ? String((settings as any).conexa_invoicing_method_id)
+        : "",
+    );
+    setInvoicingMethodName((settings as any).conexa_invoicing_method_name || "");
+    setInvoicingMethodType((settings as any).conexa_invoicing_method_type || "");
+    setAutoGenerateBillet((settings as any).conexa_auto_generate_billet === true);
+    lastLoadedId.current = settings.id;
+  }, [settings, isLoading]);
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook?gateway=conexa&agency_id=${settings?.agency_id || ""}&secret=${encodeURIComponent(webhookToken)}`;
 
