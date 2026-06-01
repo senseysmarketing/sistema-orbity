@@ -1,71 +1,124 @@
+# Conexa: Geração automática de boleto via invoicingMethodId
 
-## Causa raiz
+Causa raiz confirmada: o `POST /charge` da Conexa hoje envia apenas `salesIds + dueDate + notes`. Sem `invoicingMethodId`, a Conexa cai no meio de faturamento padrão do cliente — quando esse padrão não é boleto/Efí, a cobrança nasce sem transação. A correção principal é enviar `invoicingMethodId` (tipo `billet`) configurado por agência, e depois enriquecer com `GET /charge/:id` e `GET /charge/pix/:id` para popular boleto e Pix em campos separados.
 
-O `payment-webhook` da Conexa sempre retorna `200 OK` (boa prática para evitar retries), mas tem duas portas silenciosas que explicam todo o sintoma:
+## Fases
 
-- **Parser rígido:** só identifica quitação se `body.paidAmount && body.paymentDate` estiverem presentes. Qualquer variação de nome de campo (snake_case, aninhado, alias em PT) cai no `else` e responde "OK" sem aplicar nada.
-- **Lookup rígido:** só procura por `body.chargeId || body.id` em `client_payments.conexa_charge_id`. Se a Conexa enviar `cobrancaId`, `numeroCobranca` ou um wrapper aninhado, o `console.warn("Payment not found")` engole e responde "OK".
+### Fase 1 — Migração de banco
 
-Em ambos os casos a Conexa marca "Executada com sucesso" no relatório de webhooks (porque recebeu 2xx), mas o Orbity nunca atualiza `status='paid'` → a régua continua disparando.
+Em `agency_payment_settings` adicionar:
+- `conexa_invoicing_method_id integer`
+- `conexa_invoicing_method_name text`
+- `conexa_invoicing_method_type text`
+- `conexa_auto_generate_billet boolean default false`
 
-Os logs de edge function da Supabase têm retenção curta (~1h) e não podem confirmar qual variação está chegando, então a solução precisa **registrar permanentemente** os payloads e **tolerar múltiplas formas**.
+Em `client_payments` adicionar:
+- `conexa_sale_id text`
+- `conexa_charge_url text`
+- `conexa_billet_url text`
+- `conexa_pix_qr_code text`
+- `conexa_raw_charge jsonb`
+- `conexa_billing_status text`
+- `conexa_last_sync_at timestamptz`
 
-## Solução (100% automática, sem botão manual)
+Nova tabela `conexa_api_logs` (id, agency_id, payment_id, client_id, operation, endpoint, http_status, success, request_payload jsonb, response_payload jsonb, error_message, created_at) com GRANTs (service_role full, authenticated select da própria agência via RLS) e índice em `(agency_id, created_at desc)`. Retenção via cleanup pg_cron (30 dias).
 
-### 1. Tabela de auditoria `conexa_webhook_log`
+Campos antigos mantidos por compatibilidade com nova semântica:
+- `conexa_sale_id` = ID da venda
+- `conexa_charge_id` = ID da cobrança (somente após POST /charge)
+- `conexa_charge_url` (novo) e `conexa_invoice_url` (legado) = chargeUrl
+- `conexa_billet_url` = billetUrl (NUNCA mais salvar boleto em `conexa_pix_copy_paste`)
+- `conexa_pix_copy_paste` = copyPasteCode de `/charge/pix/:id`
+- `conexa_pix_qr_code` = qrCode de `/charge/pix/:id`
 
-Migração criando tabela com `id`, `agency_id`, `received_at`, `raw_body jsonb`, `headers jsonb`, `parsed_charge_id`, `parsed_event`, `match_status` (`matched_and_updated` / `already_processed` / `payment_not_found` / `unknown_event` / `invalid_payload`), `payment_id`, `error_message`. RLS: só master admin e owner da agência leem. Retenção: índice em `received_at`; cleanup por pg_cron mantém últimos 30 dias.
+### Fase 2 — UI ConexaIntegration
 
-Justificativa: sem isso a gente fica cego de novo na próxima vez. Vira fonte da verdade para auditar quitações.
+Nova seção "Boleto / Meio de Faturamento":
+- Botão "Buscar meios de faturamento" → chama edge `conexa-list-invoicing-methods` que faz `GET /invoicingMethods?companyId[]=<conexa_company_id>&type=billet&isActive=1&limit=100`
+- Select com `name (type) — id` das opções retornadas
+- Toggle "Gerar boleto automaticamente ao faturar"
+- Validação: se toggle ativo, `conexa_invoicing_method_id` obrigatório e meio deve ser `type=billet` e `isActive=true`
+- Persistir `conexa_invoicing_method_id/_name/_type` e `conexa_auto_generate_billet`
 
-### 2. Refatorar `payment-webhook` (apenas a branch Conexa)
+### Fase 3 — Client Conexa compartilhado
 
-- **Sempre persistir** o `raw_body` em `conexa_webhook_log` antes de qualquer parsing, mesmo em erro/401.
-- **Parser tolerante** — extrair `chargeId` de:
-  - `body.chargeId`, `body.id`, `body.charge?.id`, `body.charge?.chargeId`
-  - `body.cobrancaId`, `body.numeroCobranca`, `body.codigoCobranca`
-  - `body.cobranca?.id`, `body.data?.chargeId`, `body.data?.id`
-  - Sempre normalizar para `String(...)`
-- **Parser tolerante** — detectar quitação se QUALQUER dessas combinações existir:
-  - `paidAmount` + (`paymentDate` || `paymentOperationDate` || `dataPagamento` || `dataQuitacao`)
-  - `valorPago` + qualquer campo de data acima
-  - `status` ∈ {`paid`, `quitado`, `quitada`, `liquidado`, `settled`} com valor monetário em `amount`/`valor`/`value`
-- **Parser tolerante** — detectar cancelamento se `status` ∈ {`cancelled`, `canceled`, `cancelado`, `excluido`, `excluded`, `deleted`}.
-- **Update** continua igual ao atual (mantém `amount_paid`, `paid_at`, `paid_date`, `gateway_fee`).
-- Ao final, gravar `match_status` + `payment_id` no log de auditoria.
-- Continua retornando 200 sempre (não muda o protocolo com a Conexa).
+`supabase/functions/_shared/conexa-client.ts` com: `conexaRequest`, `listInvoicingMethods`, `validateInvoicingMethod`, `ensureConexaCustomer`, `createConexaSale`, `createConexaCharge`, `getConexaCharge`, `getConexaPix`, `parseConexaChargeUrls`, `sanitizeConexaPayloadForLogs` (remove token/headers sensíveis). Toda chamada grava em `conexa_api_logs`.
 
-### 3. Cron de reconciliação `reconcile-conexa-payments` (rede de segurança)
+### Fase 4 — POST /charge com invoicingMethodId
 
-Nova edge function, sem JWT, agendada via `pg_cron` a cada 30 min:
+Em `create-gateway-charge` (branch Conexa) e `invoice-conexa-sale`:
+```
+chargeBody = { salesIds:[saleId], dueDate, notes }
+if (settings.conexa_auto_generate_billet) {
+  if (!settings.conexa_invoicing_method_id) → 422 erro claro
+  await validateInvoicingMethod(...) → garante type=billet, isActive=true
+  chargeBody.invoicingMethodId = settings.conexa_invoicing_method_id
+}
+```
+Erros da Conexa em invoicingMethodId → log + mensagem amigável.
 
-- Para cada `agency_payment_settings` com `conexa_enabled=true`:
-  - SELECT `client_payments` WHERE `billing_type='conexa'` AND `status='pending'` AND `conexa_charge_id IS NOT NULL` AND `due_date >= today - 60 days` AND `due_date <= today + 7 days` (janela útil, ordenado por `due_date asc`, limit 200).
-  - Para cada uma, `GET {baseUrl}/charge/{conexa_charge_id}` com o `conexa_api_key` da agência.
-  - Se retorno indicar pago, aplica o mesmo update do webhook (função compartilhada `applyConexaPaymentUpdate` extraída para `_shared/`).
-  - Registra resultado em `conexa_webhook_log` com `match_status='reconciled_by_cron'`.
+### Fase 5 — Enriquecer pós-cobrança
 
-Garante que mesmo se o webhook continuar falhando por outro motivo no futuro, em no máximo 30 min as faturas pagas são reconciliadas — antes da próxima janela diária da régua (09:00 BRT).
+Após `POST /charge`:
+1. salvar `conexa_charge_id`
+2. `GET /charge/:id` → `conexa_charge_url`, `conexa_invoice_url`, `conexa_billet_url`, `conexa_raw_charge`
+3. `GET /charge/pix/:id` → se retornar, salvar `conexa_pix_copy_paste` e `conexa_pix_qr_code`
+4. atualizar `conexa_last_sync_at`
 
-### 4. Migração pg_cron
+### Fase 6 — Separar sale_id e charge_id
 
-`select cron.schedule('reconcile-conexa-payments', '*/30 * * * *', ...)` chamando a edge via `net.http_post` (executar via tool de insert, não migração — contém anon key).
+- Após `POST /sale` → gravar em `conexa_sale_id` (não em `conexa_charge_id`)
+- Após `POST /charge` → gravar em `conexa_charge_id`
+- `invoice-conexa-sale` usa `conexa_sale_id` para faturar venda ainda não faturada
+- Migração de dados: backfill best-effort copiando `conexa_charge_id` antigo (quando ainda era sale) para `conexa_sale_id` apenas para registros sem `chargeUrl` (status pré-faturamento). Demais ficam como charge.
 
-### 5. Recuperação imediata das 12 faturas atuais
+### Fase 7 — Status `conexa_billing_status`
 
-Após deploy, eu invoco manualmente o cron uma vez pra resolver Dream Hunters, One Consultoria, Rodrigo Lima, Matriz, Reference Home, EOS etc. Sem UI envolvida — só uma chamada de validação pós-deploy.
+Valores: `sale_created`, `charge_created`, `billet_available`, `charge_created_without_billet`, `pix_available` (auxiliar/metadata), `paid`, `cancelled`, `error`. Decisão após `GET /charge/:id`:
+- `billetUrl` presente → `billet_available`
+- ausente e auto boleto estava ativo → `charge_created_without_billet`
+- Pix disponível → registrar flag em metadata sem sobrescrever status principal
 
-## O que NÃO vou fazer
+### Fase 8 — Logs `conexa_api_logs`
 
-- Sem botão "Sincronizar" na UI (rejeitado).
-- Sem mexer em `process-billing-reminders` (uma vez que o status vire `paid`, ele já respeita).
-- Sem mexer em Asaas / Stripe (cobertura desta entrega = só Conexa).
-- Sem alterar o `agency_payment_settings` ou config do painel Conexa (já está OK).
+Operações: `invoicing_methods_list`, `invoicing_method_validate`, `customer_create`, `sale_create`, `charge_create`, `charge_fetch`, `pix_fetch`, `charge_reconcile`, `webhook_received`. Payload sanitizado, nunca persistir `Authorization`/token.
+
+### Fase 9 — Cobranças antigas sem boleto
+
+Sem endpoint público para gerar boleto em cobrança já criada:
+- Apenas alerta visual nas faturas antigas (`charge_created_without_billet`)
+- Não tentar endpoints não documentados
+- Documentar para o usuário pedir ao suporte Conexa endpoint oficial, se necessário
+
+### Fase 10 — `reconcile-conexa-payments`
+
+Para cada cobrança pendente: `GET /charge/:id` (atualiza `raw_charge`, `charge_url`, `billet_url`, `last_sync_at`); se sem `pix_copy_paste` tenta `GET /charge/pix/:id`. Mantém lógica atual de detecção de quitação. Não gera boleto em massa.
 
 ## Arquivos
 
-- Migração: `conexa_webhook_log` + RLS + cleanup pg_cron + `reconcile-conexa-payments` pg_cron
-- `supabase/functions/_shared/conexa-payment-update.ts` (novo, helper compartilhado)
-- `supabase/functions/payment-webhook/index.ts` (refatorar branch Conexa)
-- `supabase/functions/reconcile-conexa-payments/index.ts` (nova edge)
-- `mem://finance/billing/conexa-webhook-resilience` (nova memória documentando o parser tolerante e a rede de segurança)
+Novos:
+- `supabase/migrations/<ts>_conexa_billing_v2.sql` (colunas + tabela `conexa_api_logs` + RLS + GRANTs + cleanup cron)
+- `supabase/functions/_shared/conexa-client.ts`
+- `supabase/functions/conexa-list-invoicing-methods/index.ts` (chamada pela UI)
+
+Editados:
+- `supabase/config.toml` (registrar nova edge com `verify_jwt = true`)
+- `supabase/functions/create-gateway-charge/index.ts` (branch Conexa)
+- `supabase/functions/invoice-conexa-sale/index.ts` (usar sale_id, invoicingMethodId, enriquecer pós-charge)
+- `supabase/functions/reconcile-conexa-payments/index.ts` (enriquecimento + pix fetch)
+- `supabase/functions/_shared/conexa-payment-update.ts` (preencher novos campos)
+- `src/components/settings/ConexaIntegration.tsx` (nova seção)
+- `src/integrations/supabase/types.ts` (auto, pós-migração)
+- `mem://finance/billing/conexa-webhook-resilience` (atualizar com nova arquitetura)
+
+## Critérios de sucesso
+
+1. Auto boleto ativo → `POST /charge` envia `invoicingMethodId`
+2. Cobrança nasce com transação/boleto quando meio é billet/Efí
+3. `billetUrl` vem em `GET /charge/:id` e é salvo em `conexa_billet_url`
+4. Boleto aparece no DDA do cliente
+5. Pix continua disponível via `GET /charge/pix/:id` em campos próprios
+6. Boleto e Pix em campos separados (sem mistura)
+7. Webhook + reconciliador continuam funcionando
+8. Sem cobranças duplicadas
+9. Sem meio configurado e auto boleto ativo → bloqueia com 422 e mensagem clara antes de criar venda/cobrança
