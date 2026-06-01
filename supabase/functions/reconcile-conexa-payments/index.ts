@@ -59,7 +59,7 @@ async function reconcileAgency(s: AgencySettings) {
 
   const { data: payments, error } = await supabase
     .from("client_payments")
-    .select("id, conexa_charge_id, due_date, agency_id, status")
+    .select("id, conexa_charge_id, conexa_pix_copy_paste, due_date, agency_id, status")
     .eq("agency_id", s.agency_id)
     .eq("billing_type", "conexa")
     .eq("status", "pending")
