@@ -110,7 +110,83 @@ export function ConexaIntegration() {
     toast({ title: "Nova chave gerada!", description: "Lembre-se de atualizar a URL no painel do Conexa." });
   };
 
+  const handleFetchInvoicingMethods = async () => {
+    if (!settings?.agency_id) {
+      toast({ title: "Agência não encontrada", variant: "destructive" });
+      return;
+    }
+    if (!apiKey || !subdomain) {
+      toast({
+        title: "Configure subdomínio e token primeiro",
+        description: "Salve o subdomínio e o token de acesso do Conexa antes de buscar os meios.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setLoadingMethods(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("conexa-list-invoicing-methods", {
+        body: { agency_id: settings.agency_id, type: "billet" },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      const methods = (data?.methods ?? []) as Array<{
+        id: number;
+        name: string;
+        type: string;
+        isActive: boolean;
+      }>;
+      setInvoicingMethods(methods);
+      if (methods.length === 0) {
+        toast({
+          title: "Nenhum meio de faturamento do tipo Boleto encontrado",
+          description: "Cadastre um Meio de Faturamento (ex.: Boleto Gerencianet/Efí) no painel Conexa.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: `${methods.length} meio(s) encontrado(s)` });
+      }
+    } catch (err) {
+      toast({
+        title: "Erro ao buscar meios de faturamento",
+        description: (err as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingMethods(false);
+    }
+  };
+
+  const handleSelectInvoicingMethod = (id: string) => {
+    setInvoicingMethodId(id);
+    const found = invoicingMethods.find((m) => String(m.id) === id);
+    if (found) {
+      setInvoicingMethodName(found.name);
+      setInvoicingMethodType(found.type);
+    }
+  };
+
   const handleSave = async () => {
+    // Validação: auto boleto requer meio do tipo billet
+    if (autoGenerateBillet) {
+      if (!invoicingMethodId) {
+        toast({
+          title: "Selecione um Meio de Faturamento",
+          description: "Auto-geração de boleto está ativa. Clique em 'Buscar meios de faturamento' e escolha um.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (invoicingMethodType && invoicingMethodType !== "billet") {
+        toast({
+          title: "Tipo inválido para boleto",
+          description: `O meio selecionado é "${invoicingMethodType}". Selecione um do tipo "billet".`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     try {
       await updateSettings({
         conexa_api_key: apiKey || null,
@@ -122,6 +198,10 @@ export function ConexaIntegration() {
         conexa_receiving_method_id: receivingMethodId ? parseInt(receivingMethodId, 10) : null,
         conexa_webhook_token: webhookToken || null,
         conexa_enabled: gatewayActive,
+        conexa_invoicing_method_id: invoicingMethodId ? parseInt(invoicingMethodId, 10) : null,
+        conexa_invoicing_method_name: invoicingMethodName || null,
+        conexa_invoicing_method_type: invoicingMethodType || null,
+        conexa_auto_generate_billet: autoGenerateBillet,
       } as any);
       toast({ title: "Configurações salvas!", description: gatewayActive ? "Conexa habilitado como gateway." : "Conexa desabilitado." });
     } catch {
