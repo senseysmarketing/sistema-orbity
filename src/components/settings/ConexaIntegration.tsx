@@ -428,7 +428,9 @@ export function ConexaIntegration() {
           {autoGenerateBillet && !invoicingMethodId && (
             <Alert variant="destructive">
               <AlertDescription className="text-xs">
-                Selecione um meio de faturamento antes de salvar com a auto-geração ativa.
+                {invoicingMethodName
+                  ? `Aviso crítico: o nome "${invoicingMethodName}" está salvo, mas o ID do Meio de Faturamento está ausente. Por isso o Conexa não está gerando o boleto Efí. Clique em "Buscar meios de faturamento", selecione novamente o meio e salve.`
+                  : "Selecione um meio de faturamento antes de salvar com a auto-geração ativa."}
               </AlertDescription>
             </Alert>
           )}
