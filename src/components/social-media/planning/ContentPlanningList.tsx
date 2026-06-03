@@ -203,7 +203,6 @@ export function ContentPlanningList() {
             <ContentPlanCard
               key={plan.id}
               plan={plan}
-              onView={handleViewPlan}
               onEdit={handleEditPlan}
               onCreateTasks={handleCreateTasksFromPlan}
               onDelete={deletePlan}
