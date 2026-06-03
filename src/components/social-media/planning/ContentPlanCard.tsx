@@ -21,7 +21,7 @@ const STATUS_MAP: Record<string, { label: string; className: string }> = {
   archived: { label: "Arquivado", className: "bg-muted text-muted-foreground" },
 };
 
-export function ContentPlanCard({ plan, onView, onEdit, onCreateTasks, onDelete, onCopyWeeklySummary }: ContentPlanCardProps) {
+export function ContentPlanCard({ plan, onEdit, onCreateTasks, onDelete, onCopyWeeklySummary }: ContentPlanCardProps) {
   const items = plan.content_plan_items || [];
   const discarded = items.filter((item) => item.status === "discarded").length;
   const operationalItems = items.filter((item) => item.status !== "discarded");
