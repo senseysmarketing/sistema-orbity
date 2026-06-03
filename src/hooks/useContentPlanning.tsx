@@ -110,6 +110,7 @@ type EditablePlanItemFields = Pick<
   | "format"
   | "platform"
   | "post_date"
+  | "due_date"
   | "content_type"
   | "creative_instructions"
   | "reference_notes"
