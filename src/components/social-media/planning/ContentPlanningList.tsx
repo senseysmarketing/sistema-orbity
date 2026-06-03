@@ -33,7 +33,7 @@ export function ContentPlanningList() {
   const [manualOpen, setManualOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [detailsEditMode, setDetailsEditMode] = useState(false);
+  // editMode no longer needed — sheet always opens in edit mode
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [currentWizardData, setCurrentWizardData] = useState<WizardData | null>(null);
   const [currentPlanResult, setCurrentPlanResult] = useState<AIPlanResult | null>(null);
