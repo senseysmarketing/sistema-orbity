@@ -28,6 +28,8 @@ interface ContentPlanItemEditDialogProps {
 const FORMATS = ["carrossel", "feed", "reels", "stories", "video", "artigo"];
 const PLATFORMS = ["Instagram", "Facebook", "TikTok", "LinkedIn", "YouTube", "Twitter/X"];
 
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
 function normalizePlatform(value: string | null | undefined): string {
   if (!value) return "";
   const found = PLATFORMS.find((platform) => platform.toLowerCase() === value.toLowerCase());
