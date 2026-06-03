@@ -481,6 +481,7 @@ export function useContentPlanning() {
         format: itemData.format || null,
         platform: itemData.platform || null,
         post_date: itemData.post_date || null,
+        due_date: itemData.due_date || null,
         content_type: itemData.content_type || null,
         creative_instructions: itemData.creative_instructions || null,
         reference_notes: itemData.reference_notes || null,
