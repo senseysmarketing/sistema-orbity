@@ -87,6 +87,7 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
       description: description || null,
       caption: caption || null,
       post_date: postDate ? format(postDate, "yyyy-MM-dd") : null,
+      due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : null,
       format: formatVal || null,
       platform: platform || null,
       content_type: contentType || null,
