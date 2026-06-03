@@ -505,6 +505,7 @@ export function useContentPlanning() {
     return addPlanItem(item.plan_id, {
       day_number: item.day_number,
       post_date: item.post_date,
+      due_date: item.due_date,
       title: `${item.title} (copia)`,
       description: item.description,
       caption: item.caption,
