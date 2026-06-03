@@ -53,9 +53,11 @@ type AgencyUserRow = {
 };
 
 function getStrategyText(plan: ContentPlan) {
-  if (plan.ai_response?.strategy_summary) return plan.ai_response.strategy_summary;
+  const aiResp = plan.ai_response as { strategy_summary?: string } | null;
+  if (aiResp?.strategy_summary) return aiResp.strategy_summary;
   if (typeof plan.strategy_context === "string") return plan.strategy_context;
-  return plan.strategy_context?.notes || plan.strategy_context?.strategicFocus || "";
+  const ctx = plan.strategy_context as { notes?: string; strategicFocus?: string } | null;
+  return ctx?.notes || ctx?.strategicFocus || "";
 }
 
 function isTaskCreated(item: ContentPlanItem) {
