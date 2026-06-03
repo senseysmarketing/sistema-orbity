@@ -1,34 +1,40 @@
-## Diagnóstico
+# Ajustes no Planejamento de Redes Sociais
 
-O erro não está na seleção visual. O Conexa retornou o meio corretamente, mas a UI está lendo o campo errado da resposta:
+## 1. Sheet do planejamento (`ContentPlanDetailsSheet.tsx`)
 
-- A API do Conexa retornou: `invoicingMethodId: 3`, `name: Boleto Efi`, `type: billet`.
-- O componente espera `id`, então salva `id` como `NaN/null`.
-- No banco ficou: `conexa_invoicing_method_name = 'Boleto Efi'`, mas `conexa_invoicing_method_id = null`.
-- Por isso a Edge Function bloqueia a geração do boleto com 422 antes de chamar `POST /charge`.
+- Remover a distinção entre "Ver detalhes" e "Editar planejamento". O sheet sempre abre em modo edição.
+- Botão **Adicionar conteúdo** sempre visível no topo da lista (eliminar o gate `editMode`).
+- Lista de itens sempre mostrando os botões de ação (editar, duplicar, excluir).
+- Manter o bloco de criação de tarefas (seleção de pendentes + responsáveis + botão "Criar X tarefas") sempre visível quando houver pendentes, independente de modo.
+- No botão de **Editar conteúdo** (lápis): ocultar quando `item.task_id` existir (conteúdo já virou tarefa). Manter apenas duplicar / abrir tarefa / arquivar.
 
-## Plano de correção
+## 2. `ContentPlanCard.tsx` (menu dos 3 pontos)
 
-1. **Normalizar resposta da listagem de meios**
-   - Ajustar `_shared/conexa-client.ts` para aceitar tanto `id` quanto `invoicingMethodId` ao montar a lista.
-   - Garantir que o frontend sempre receba `id: 3` quando a API retornar `invoicingMethodId: 3`.
+- Remover a opção "Ver detalhes". Manter apenas "Editar planejamento" (e demais ações já existentes como duplicar, arquivar).
+- Clique no card chama direto `handleEditPlan` (modo edição) em vez de `handleViewPlan`.
 
-2. **Proteger o salvamento no frontend**
-   - Ajustar `ConexaIntegration.tsx` para não permitir salvar um meio sem ID numérico válido.
-   - Ao buscar meios, se houver o meio salvo por nome/tipo, selecionar automaticamente o ID correto encontrado.
-   - Melhorar o estado visual para mostrar claramente quando o ID está válido.
+## 3. `ContentPlanningList.tsx`
 
-3. **Aplicar correção imediata nos dados atuais**
-   - Rodar uma migration pontual para atualizar a agência afetada:
-     - `conexa_invoicing_method_id = 3`
-     - manter `conexa_invoicing_method_name = 'Boleto Efi'`
-     - manter `conexa_invoicing_method_type = 'billet'`
-   - Isso corrige o ambiente atual sem depender de você refazer manualmente a seleção.
+- Como agora só existe um modo, remover o state `detailsEditMode` (ou fixar em `true`) e simplificar os handlers `handleViewPlan` / `handleEditPlan` / `handleCreateTasksFromPlan` para uma única função que abre o sheet.
 
-4. **Reimplantar funções Conexa afetadas**
-   - Reimplantar `conexa-list-invoicing-methods`, `create-gateway-charge` e `invoice-conexa-sale`.
-   - Validar que a próxima geração envia `invoicingMethodId: 3` no `POST /charge`.
+## 4. Modal de criação/edição de conteúdo (`ContentPlanItemEditDialog.tsx`)
 
-## Resultado esperado
+Espelhar visualmente o formulário de tarefas de redes sociais, com:
 
-Após a correção, a configuração passará a ter ID real do Meio de Faturamento e a cobrança Conexa será criada com `invoicingMethodId`, permitindo que o boleto Efí seja gerado automaticamente.
+- Renomear o label "Data de publicação" para **"Data de vencimento"** (mesmo campo `post_date`, que já é usado como `due_date` ao gerar a tarefa). Deixar o campo em destaque, no topo logo após Título.
+- Reordenar campos seguindo o padrão da tarefa de redes sociais: Título → Data de vencimento → Formato + Plataforma → Tipo de conteúdo → Objetivo → Ideia/descrição → Legenda → Instruções criativas → Referências → Hashtags.
+- Ajuste estético no `<Select>` de Formato: exibir cada opção com a primeira letra maiúscula (ex.: "Carrossel", "Feed", "Reels", "Stories", "Vídeo", "Artigo"). Manter o `value` em minúsculas para não quebrar dados existentes — só capitalizar o label exibido.
+
+## Detalhes técnicos
+
+- `editMode` deixa de ser prop relevante em `ContentPlanDetailsSheet`. Pode ser removido da interface ou mantido com default `true` para evitar breaking changes em outros locais (verificar `ContentPlanningList`).
+- Para esconder o botão editar quando `item.task_id`: condicional `{!item.task_id && <Button …Pencil…/>}` dentro do bloco de ações.
+- Capitalização no Select: criar helper `capitalize(str)` e usar `{capitalize(f)}` no `SelectItem`.
+- Nenhuma alteração de schema é necessária; `post_date` continua sendo a fonte da data e já é mapeado para `due_date` na criação da tarefa.
+
+## Arquivos afetados
+
+- `src/components/social-media/planning/ContentPlanDetailsSheet.tsx`
+- `src/components/social-media/planning/ContentPlanCard.tsx`
+- `src/components/social-media/planning/ContentPlanningList.tsx`
+- `src/components/social-media/planning/ContentPlanItemEditDialog.tsx`
