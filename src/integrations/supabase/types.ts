@@ -2447,6 +2447,7 @@ export type Database = {
           creative_instructions: string | null
           day_number: number | null
           description: string | null
+          due_date: string | null
           format: string | null
           hashtags: string | null
           id: string
@@ -2468,6 +2469,7 @@ export type Database = {
           creative_instructions?: string | null
           day_number?: number | null
           description?: string | null
+          due_date?: string | null
           format?: string | null
           hashtags?: string | null
           id?: string
@@ -2489,6 +2491,7 @@ export type Database = {
           creative_instructions?: string | null
           day_number?: number | null
           description?: string | null
+          due_date?: string | null
           format?: string | null
           hashtags?: string | null
           id?: string

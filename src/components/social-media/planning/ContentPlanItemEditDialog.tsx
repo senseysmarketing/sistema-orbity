@@ -41,6 +41,7 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
   const [description, setDescription] = useState("");
   const [caption, setCaption] = useState("");
   const [postDate, setPostDate] = useState<Date | undefined>();
+  const [dueDate, setDueDate] = useState<Date | undefined>();
   const [formatVal, setFormatVal] = useState("");
   const [platform, setPlatform] = useState("");
   const [contentType, setContentType] = useState("");
@@ -65,6 +66,7 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
       setDescription(item.description || "");
       setCaption(item.caption || "");
       setPostDate(item.post_date ? new Date(item.post_date + "T12:00:00") : undefined);
+      setDueDate(item.due_date ? new Date(item.due_date + "T12:00:00") : undefined);
       setFormatVal(item.format || "");
       setPlatform(normalizePlatform(item.platform));
       setContentType(item.content_type || "");
@@ -85,6 +87,7 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
       description: description || null,
       caption: caption || null,
       post_date: postDate ? format(postDate, "yyyy-MM-dd") : null,
+      due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : null,
       format: formatVal || null,
       platform: platform || null,
       content_type: contentType || null,
@@ -169,19 +172,35 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
             <Input value={title} onChange={(event) => setTitle(event.target.value)} />
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Data de vencimento *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !postDate && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {postDate ? format(postDate, "dd/MM/yyyy") : "Selecionar data"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={postDate} onSelect={setPostDate} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
-              </PopoverContent>
-            </Popover>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Data de vencimento *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !dueDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dueDate ? format(dueDate, "dd/MM/yyyy") : "Selecionar"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dueDate} onSelect={setDueDate} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Data de publicação</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !postDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {postDate ? format(postDate, "dd/MM/yyyy") : "Selecionar"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={postDate} onSelect={setPostDate} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

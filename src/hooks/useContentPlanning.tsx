@@ -12,6 +12,7 @@ export interface ContentPlanItem {
   day_number: number | null;
   order_position: number | null;
   post_date: string | null;
+  due_date: string | null;
   title: string;
   description: string | null;
   caption: string | null;
@@ -109,6 +110,7 @@ type EditablePlanItemFields = Pick<
   | "format"
   | "platform"
   | "post_date"
+  | "due_date"
   | "content_type"
   | "creative_instructions"
   | "reference_notes"
@@ -235,6 +237,7 @@ export function useContentPlanning() {
           day_number: item.day_number,
           order_position: index,
           post_date: item.post_date,
+          due_date: item.post_date,
           title: item.title,
           description: item.description,
           content_type: item.content_type,
@@ -345,6 +348,7 @@ export function useContentPlanning() {
             platform: item.platform,
             post_type: item.format,
             post_date: item.post_date,
+            due_date: item.due_date ?? item.post_date,
             hashtags: item.hashtags ? item.hashtags.split(",").map((h: string) => h.trim()).filter(Boolean) : null,
             creative_instructions: item.creative_instructions,
             created_by: user.id,
@@ -478,6 +482,7 @@ export function useContentPlanning() {
         format: itemData.format || null,
         platform: itemData.platform || null,
         post_date: itemData.post_date || null,
+        due_date: itemData.due_date || null,
         content_type: itemData.content_type || null,
         creative_instructions: itemData.creative_instructions || null,
         reference_notes: itemData.reference_notes || null,
@@ -501,6 +506,7 @@ export function useContentPlanning() {
     return addPlanItem(item.plan_id, {
       day_number: item.day_number,
       post_date: item.post_date,
+      due_date: item.due_date,
       title: `${item.title} (copia)`,
       description: item.description,
       caption: item.caption,
