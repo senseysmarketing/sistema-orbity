@@ -21,7 +21,6 @@ interface ContentPlanDetailsSheetProps {
   open: boolean;
   onClose: () => void;
   onCreateTasks: (planId: string, itemIds: string[], assignedUserIds?: string[]) => Promise<boolean>;
-  editMode?: boolean;
   onUpdateItem?: (itemId: string, updates: Partial<ContentPlanItem>) => Promise<boolean>;
   onDeleteItem?: (itemId: string) => Promise<boolean>;
   onAddItem?: (planId: string, itemData: Partial<ContentPlanItem>) => Promise<boolean>;
