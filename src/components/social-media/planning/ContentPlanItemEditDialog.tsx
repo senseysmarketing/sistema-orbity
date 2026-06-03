@@ -66,6 +66,7 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
       setDescription(item.description || "");
       setCaption(item.caption || "");
       setPostDate(item.post_date ? new Date(item.post_date + "T12:00:00") : undefined);
+      setDueDate(item.due_date ? new Date(item.due_date + "T12:00:00") : undefined);
       setFormatVal(item.format || "");
       setPlatform(normalizePlatform(item.platform));
       setContentType(item.content_type || "");
