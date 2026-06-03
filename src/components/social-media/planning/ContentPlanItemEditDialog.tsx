@@ -169,13 +169,28 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
             <Input value={title} onChange={(event) => setTitle(event.target.value)} />
           </div>
 
+          <div className="space-y-1.5">
+            <Label>Data de vencimento *</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !postDate && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {postDate ? format(postDate, "dd/MM/yyyy") : "Selecionar data"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={postDate} onSelect={setPostDate} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+              </PopoverContent>
+            </Popover>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Formato *</Label>
               <Select value={formatVal} onValueChange={setFormatVal}>
                 <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
                 <SelectContent>
-                  {FORMATS.map((formatItem) => <SelectItem key={formatItem} value={formatItem}>{formatItem}</SelectItem>)}
+                  {FORMATS.map((formatItem) => <SelectItem key={formatItem} value={formatItem}>{capitalize(formatItem)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -191,18 +206,13 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
           </div>
 
           <div className="space-y-1.5">
-            <Label>Data de publicacao</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !postDate && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {postDate ? format(postDate, "dd/MM/yyyy") : "Selecionar data"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={postDate} onSelect={setPostDate} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
-              </PopoverContent>
-            </Popover>
+            <Label>Tipo de conteudo</Label>
+            <Input value={contentType} onChange={(event) => setContentType(event.target.value)} placeholder="Ex: educativo, promocional..." />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Objetivo</Label>
+            <Input value={objective} onChange={(event) => setObjective(event.target.value)} />
           </div>
 
           <div className="space-y-1.5">
@@ -216,11 +226,6 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
           </div>
 
           <div className="space-y-1.5">
-            <Label>Tipo de conteudo</Label>
-            <Input value={contentType} onChange={(event) => setContentType(event.target.value)} placeholder="Ex: educativo, promocional..." />
-          </div>
-
-          <div className="space-y-1.5">
             <Label>Instrucoes criativas</Label>
             <Textarea value={creativeInstructions} onChange={(event) => setCreativeInstructions(event.target.value)} rows={2} />
           </div>
@@ -228,11 +233,6 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
           <div className="space-y-1.5">
             <Label>Referencias / observacoes</Label>
             <Textarea value={referenceNotes} onChange={(event) => setReferenceNotes(event.target.value)} rows={2} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Objetivo</Label>
-            <Input value={objective} onChange={(event) => setObjective(event.target.value)} />
           </div>
 
           <div className="space-y-1.5">
