@@ -38,7 +38,7 @@ export function ContentPlanCard({ plan, onEdit, onCreateTasks, onDelete, onCopyW
   })();
 
   return (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onView(plan)}>
+    <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onEdit(plan)}>
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -55,9 +55,6 @@ export function ContentPlanCard({ plan, onEdit, onCreateTasks, onDelete, onCopyW
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={(event) => { event.stopPropagation(); onView(plan); }}>
-                  <Eye className="h-4 w-4 mr-2" />Ver detalhes
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={(event) => { event.stopPropagation(); onEdit(plan); }}>
                   <Pencil className="h-4 w-4 mr-2" />Editar planejamento
                 </DropdownMenuItem>
