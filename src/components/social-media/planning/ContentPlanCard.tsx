@@ -3,12 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Calendar, Eye, ListChecks, MessageSquareText, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Calendar, ListChecks, MessageSquareText, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { ContentPlan } from "@/hooks/useContentPlanning";
 
 interface ContentPlanCardProps {
   plan: ContentPlan;
-  onView: (plan: ContentPlan) => void;
   onEdit: (plan: ContentPlan) => void;
   onCreateTasks: (plan: ContentPlan) => void;
   onDelete: (planId: string) => void;
