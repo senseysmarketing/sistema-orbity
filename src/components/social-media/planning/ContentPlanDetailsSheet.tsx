@@ -157,6 +157,7 @@ export function ContentPlanDetailsSheet({
       day_number: null,
       order_position: items.length,
       post_date: null,
+      due_date: null,
       title: "",
       description: null,
       caption: null,
