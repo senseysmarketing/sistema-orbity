@@ -41,6 +41,7 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
   const [description, setDescription] = useState("");
   const [caption, setCaption] = useState("");
   const [postDate, setPostDate] = useState<Date | undefined>();
+  const [dueDate, setDueDate] = useState<Date | undefined>();
   const [formatVal, setFormatVal] = useState("");
   const [platform, setPlatform] = useState("");
   const [contentType, setContentType] = useState("");
