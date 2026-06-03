@@ -234,7 +234,7 @@ export function ContentPlanningList() {
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
         onCreateTasks={createTasksFromItems}
-        editMode={detailsEditMode}
+        
         onUpdateItem={updatePlanItem}
         onDeleteItem={deletePlanItem}
         onAddItem={addPlanItem}
