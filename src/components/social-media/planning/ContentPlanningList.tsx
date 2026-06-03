@@ -107,27 +107,18 @@ export function ContentPlanningList() {
     setManualSaving(false);
     if (planId) {
       setSelectedPlanId(planId);
-      setDetailsEditMode(true);
       setDetailsOpen(true);
     }
     return planId;
   };
 
-  const handleViewPlan = (plan: ContentPlan) => {
-    setSelectedPlanId(plan.id);
-    setDetailsEditMode(false);
-    setDetailsOpen(true);
-  };
-
   const handleEditPlan = (plan: ContentPlan) => {
     setSelectedPlanId(plan.id);
-    setDetailsEditMode(true);
     setDetailsOpen(true);
   };
 
   const handleCreateTasksFromPlan = (plan: ContentPlan) => {
     setSelectedPlanId(plan.id);
-    setDetailsEditMode(false);
     setDetailsOpen(true);
   };
 
