@@ -12,6 +12,7 @@ export interface ContentPlanItem {
   day_number: number | null;
   order_position: number | null;
   post_date: string | null;
+  due_date: string | null;
   title: string;
   description: string | null;
   caption: string | null;

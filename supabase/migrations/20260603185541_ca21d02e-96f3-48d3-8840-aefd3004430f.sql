@@ -1,0 +1,1 @@
+ALTER TABLE public.content_plan_items ADD COLUMN IF NOT EXISTS due_date date;
