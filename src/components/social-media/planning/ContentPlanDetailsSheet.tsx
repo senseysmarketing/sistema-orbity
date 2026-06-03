@@ -68,7 +68,6 @@ export function ContentPlanDetailsSheet({
   open,
   onClose,
   onCreateTasks,
-  editMode = false,
   onUpdateItem,
   onDeleteItem,
   onAddItem,
