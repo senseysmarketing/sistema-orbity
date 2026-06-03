@@ -237,6 +237,7 @@ export function useContentPlanning() {
           day_number: item.day_number,
           order_position: index,
           post_date: item.post_date,
+          due_date: item.post_date,
           title: item.title,
           description: item.description,
           content_type: item.content_type,
