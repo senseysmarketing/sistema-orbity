@@ -2441,6 +2441,7 @@ export type Database = {
       }
       content_plan_items: {
         Row: {
+          caption: string | null
           content_type: string | null
           created_at: string
           creative_instructions: string | null
@@ -2450,15 +2451,18 @@ export type Database = {
           hashtags: string | null
           id: string
           objective: string | null
+          order_position: number
           plan_id: string
           platform: string | null
           post_date: string | null
+          reference_notes: string | null
           status: string
           task_id: string | null
           title: string
           updated_at: string
         }
         Insert: {
+          caption?: string | null
           content_type?: string | null
           created_at?: string
           creative_instructions?: string | null
@@ -2468,15 +2472,18 @@ export type Database = {
           hashtags?: string | null
           id?: string
           objective?: string | null
+          order_position?: number
           plan_id: string
           platform?: string | null
           post_date?: string | null
+          reference_notes?: string | null
           status?: string
           task_id?: string | null
           title: string
           updated_at?: string
         }
         Update: {
+          caption?: string | null
           content_type?: string | null
           created_at?: string
           creative_instructions?: string | null
@@ -2486,9 +2493,11 @@ export type Database = {
           hashtags?: string | null
           id?: string
           objective?: string | null
+          order_position?: number
           plan_id?: string
           platform?: string | null
           post_date?: string | null
+          reference_notes?: string | null
           status?: string
           task_id?: string | null
           title?: string
@@ -2518,6 +2527,7 @@ export type Database = {
           client_id: string
           created_at: string
           created_by: string
+          creation_mode: string
           depth_level: string
           id: string
           month_year: string
@@ -2532,6 +2542,7 @@ export type Database = {
           client_id: string
           created_at?: string
           created_by: string
+          creation_mode?: string
           depth_level?: string
           id?: string
           month_year: string
@@ -2546,6 +2557,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           created_by?: string
+          creation_mode?: string
           depth_level?: string
           id?: string
           month_year?: string

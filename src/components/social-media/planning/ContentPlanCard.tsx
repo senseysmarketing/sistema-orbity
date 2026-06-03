@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Calendar, MoreVertical, Trash2, Eye, ListChecks, MessageSquareText, Pencil } from "lucide-react";
+import { Calendar, Eye, ListChecks, MessageSquareText, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { ContentPlan } from "@/hooks/useContentPlanning";
 
 interface ContentPlanCardProps {
@@ -18,17 +18,19 @@ interface ContentPlanCardProps {
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
   draft: { label: "Rascunho", className: "bg-muted text-muted-foreground" },
   active: { label: "Ativo", className: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" },
-  completed: { label: "Concluído", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+  completed: { label: "Concluido", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
   archived: { label: "Arquivado", className: "bg-muted text-muted-foreground" },
 };
 
 export function ContentPlanCard({ plan, onView, onEdit, onCreateTasks, onDelete, onCopyWeeklySummary }: ContentPlanCardProps) {
   const items = plan.content_plan_items || [];
-  const totalItems = items.length;
-  const taskCreated = items.filter((i) => i.status === "task_created" || i.status === "in_progress" || i.status === "published").length;
-  const progress = totalItems > 0 ? Math.round((taskCreated / totalItems) * 100) : 0;
-
+  const discarded = items.filter((item) => item.status === "discarded").length;
+  const operationalItems = items.filter((item) => item.status !== "discarded");
+  const pending = operationalItems.filter((item) => item.status === "planned" && !item.task_id).length;
+  const taskCreated = operationalItems.filter((item) => item.task_id || ["task_created", "in_progress", "published"].includes(item.status)).length;
+  const progress = operationalItems.length > 0 ? Math.round((taskCreated / operationalItems.length) * 100) : 0;
   const statusInfo = STATUS_MAP[plan.status] || STATUS_MAP.draft;
+  const creationLabel = plan.creation_mode === "manual" ? "Manual" : "IA";
 
   const monthLabel = (() => {
     const [year, month] = plan.month_year.split("-");
@@ -48,27 +50,27 @@ export function ContentPlanCard({ plan, onView, onEdit, onCreateTasks, onDelete,
           <div className="flex items-center gap-1.5 shrink-0">
             <Badge className={statusInfo.className}>{statusInfo.label}</Badge>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuTrigger asChild onClick={(event) => event.stopPropagation()}>
                 <Button variant="ghost" size="icon" className="h-7 w-7">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onView(plan); }}>
+                <DropdownMenuItem onClick={(event) => { event.stopPropagation(); onView(plan); }}>
                   <Eye className="h-4 w-4 mr-2" />Ver detalhes
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(plan); }}>
+                <DropdownMenuItem onClick={(event) => { event.stopPropagation(); onEdit(plan); }}>
                   <Pencil className="h-4 w-4 mr-2" />Editar planejamento
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateTasks(plan); }}>
+                <DropdownMenuItem onClick={(event) => { event.stopPropagation(); onCreateTasks(plan); }}>
                   <ListChecks className="h-4 w-4 mr-2" />Criar tarefas
                 </DropdownMenuItem>
                 {onCopyWeeklySummary && (
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCopyWeeklySummary(plan); }}>
+                  <DropdownMenuItem onClick={(event) => { event.stopPropagation(); onCopyWeeklySummary(plan); }}>
                     <MessageSquareText className="h-4 w-4 mr-2" />Resumo semanal
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(plan.id); }}>
+                <DropdownMenuItem className="text-destructive" onClick={(event) => { event.stopPropagation(); onDelete(plan.id); }}>
                   <Trash2 className="h-4 w-4 mr-2" />Excluir
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -79,25 +81,31 @@ export function ContentPlanCard({ plan, onView, onEdit, onCreateTasks, onDelete,
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Calendar className="h-3.5 w-3.5" />
           <span className="capitalize">{monthLabel}</span>
-          <span>•</span>
-          <span>{totalItems} conteúdos</span>
+          <span>-</span>
+          <span>{operationalItems.length} conteudos</span>
+        </div>
+
+        <div className="flex flex-wrap gap-1">
+          <Badge variant="outline" className="text-[10px]">{creationLabel}</Badge>
+          {pending > 0 && <Badge variant="outline" className="text-[10px]">{pending} pendentes</Badge>}
+          {discarded > 0 && <Badge variant="outline" className="text-[10px]">{discarded} descartados</Badge>}
         </div>
 
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Progresso</span>
-            <span className="font-medium">{taskCreated}/{totalItems} tarefas criadas</span>
+            <span className="font-medium">{taskCreated}/{operationalItems.length} tarefas criadas</span>
           </div>
           <Progress value={progress} className="h-1.5" />
         </div>
 
         {items.length > 0 && (
           <div className="flex gap-1 flex-wrap">
-            {[...new Set(items.map((i) => i.format).filter(Boolean))].slice(0, 4).map((f) => (
-              <Badge key={f} variant="outline" className="text-[10px]">{f}</Badge>
+            {[...new Set(items.map((item) => item.format).filter(Boolean))].slice(0, 4).map((formatItem) => (
+              <Badge key={formatItem} variant="outline" className="text-[10px]">{formatItem}</Badge>
             ))}
-            {[...new Set(items.map((i) => i.platform).filter(Boolean))].slice(0, 3).map((p) => (
-              <Badge key={p} variant="outline" className="text-[10px]">{p}</Badge>
+            {[...new Set(items.map((item) => item.platform).filter(Boolean))].slice(0, 3).map((platformItem) => (
+              <Badge key={platformItem} variant="outline" className="text-[10px]">{platformItem}</Badge>
             ))}
           </div>
         )}
