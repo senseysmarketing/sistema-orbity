@@ -21,7 +21,6 @@ interface ContentPlanDetailsSheetProps {
   open: boolean;
   onClose: () => void;
   onCreateTasks: (planId: string, itemIds: string[], assignedUserIds?: string[]) => Promise<boolean>;
-  editMode?: boolean;
   onUpdateItem?: (itemId: string, updates: Partial<ContentPlanItem>) => Promise<boolean>;
   onDeleteItem?: (itemId: string) => Promise<boolean>;
   onAddItem?: (planId: string, itemData: Partial<ContentPlanItem>) => Promise<boolean>;
@@ -53,9 +52,11 @@ type AgencyUserRow = {
 };
 
 function getStrategyText(plan: ContentPlan) {
-  if (plan.ai_response?.strategy_summary) return plan.ai_response.strategy_summary;
+  const aiResp = plan.ai_response as { strategy_summary?: string } | null;
+  if (aiResp?.strategy_summary) return aiResp.strategy_summary;
   if (typeof plan.strategy_context === "string") return plan.strategy_context;
-  return plan.strategy_context?.notes || plan.strategy_context?.strategicFocus || "";
+  const ctx = plan.strategy_context as { notes?: string; strategicFocus?: string } | null;
+  return ctx?.notes || ctx?.strategicFocus || "";
 }
 
 function isTaskCreated(item: ContentPlanItem) {
@@ -67,7 +68,6 @@ export function ContentPlanDetailsSheet({
   open,
   onClose,
   onCreateTasks,
-  editMode = false,
   onUpdateItem,
   onDeleteItem,
   onAddItem,
@@ -236,7 +236,7 @@ export function ContentPlanDetailsSheet({
                 </SelectContent>
               </Select>
 
-              {editMode && (
+              {onAddItem && (
                 <Button variant="outline" size="sm" onClick={handleAddItem}>
                   <Plus className="mr-2 h-4 w-4" />
                   Adicionar conteudo
@@ -244,14 +244,14 @@ export function ContentPlanDetailsSheet({
               )}
             </div>
 
-            {!editMode && pendingItems.length > 0 && (
+            {pendingItems.length > 0 && (
               <div className="flex items-center gap-2 shrink-0">
                 <Checkbox checked={selectedItems.size === pendingItems.length && pendingItems.length > 0} onCheckedChange={selectAllPending} />
                 <span className="text-xs text-muted-foreground">Selecionar todos pendentes ({pendingItems.length})</span>
               </div>
             )}
 
-            {!editMode && pendingItems.length > 0 && (
+            {pendingItems.length > 0 && (
               <div className="space-y-2 shrink-0">
                 <Label className="flex items-center gap-1.5 text-xs">
                   <Users className="h-3.5 w-3.5" />
@@ -272,13 +272,13 @@ export function ContentPlanDetailsSheet({
                   const isPending = item.status === "planned" && !item.task_id;
                   const statusInfo = STATUS_BADGES[item.status] || STATUS_BADGES.planned;
                   return (
-                    <div key={item.id} className={`p-3 rounded-md border bg-card ${!editMode && isPending && selectedItems.has(item.id) ? "border-primary/40 bg-primary/5" : ""}`}>
+                    <div key={item.id} className={`p-3 rounded-md border bg-card ${isPending && selectedItems.has(item.id) ? "border-primary/40 bg-primary/5" : ""}`}>
                       <div className="flex items-start gap-2">
-                        {!editMode && isPending ? (
+                        {isPending ? (
                           <Checkbox checked={selectedItems.has(item.id)} onCheckedChange={() => toggleItem(item.id)} className="mt-0.5" />
-                        ) : !editMode ? (
+                        ) : (
                           <CheckCircle2 className={`h-4 w-4 mt-0.5 shrink-0 ${item.status === "discarded" ? "text-muted-foreground" : "text-green-500"}`} />
-                        ) : null}
+                        )}
 
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="flex flex-wrap items-center gap-1.5">
@@ -299,33 +299,33 @@ export function ContentPlanDetailsSheet({
                           {item.caption && <p className="text-xs text-muted-foreground line-clamp-2">Legenda: {item.caption}</p>}
                         </div>
 
-                        {editMode && (
-                          <div className="flex gap-1 shrink-0">
+                        <div className="flex gap-1 shrink-0">
+                          {!item.task_id && (
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            {onDuplicateItem && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDuplicateItem(item)}>
-                                <Copy className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            {item.task_id ? (
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate("/dashboard/tasks")}>
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </Button>
-                            ) : null}
-                            {onDeleteItem && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive hover:text-destructive"
-                                onClick={() => onDeleteItem(item.id)}
-                              >
-                                {item.task_id ? <Archive className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5" />}
-                              </Button>
-                            )}
-                          </div>
-                        )}
+                          )}
+                          {onDuplicateItem && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDuplicateItem(item)}>
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {item.task_id && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate("/dashboard/tasks")}>
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {onDeleteItem && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => onDeleteItem(item.id)}
+                            >
+                              {item.task_id ? <Archive className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5" />}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -340,7 +340,7 @@ export function ContentPlanDetailsSheet({
               </div>
             </ScrollArea>
 
-            {!editMode && pendingItems.length > 0 && (
+            {pendingItems.length > 0 && (
               <div className="shrink-0 pt-4 border-t">
                 {assignedUserIds.length === 0 && selectedItems.size > 0 && (
                   <p className="text-xs text-destructive mb-2">Selecione ao menos um responsavel para criar as tarefas.</p>

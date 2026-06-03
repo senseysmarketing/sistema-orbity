@@ -33,7 +33,7 @@ export function ContentPlanningList() {
   const [manualOpen, setManualOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [detailsEditMode, setDetailsEditMode] = useState(false);
+  // editMode no longer needed — sheet always opens in edit mode
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [currentWizardData, setCurrentWizardData] = useState<WizardData | null>(null);
   const [currentPlanResult, setCurrentPlanResult] = useState<AIPlanResult | null>(null);
@@ -107,27 +107,18 @@ export function ContentPlanningList() {
     setManualSaving(false);
     if (planId) {
       setSelectedPlanId(planId);
-      setDetailsEditMode(true);
       setDetailsOpen(true);
     }
     return planId;
   };
 
-  const handleViewPlan = (plan: ContentPlan) => {
-    setSelectedPlanId(plan.id);
-    setDetailsEditMode(false);
-    setDetailsOpen(true);
-  };
-
   const handleEditPlan = (plan: ContentPlan) => {
     setSelectedPlanId(plan.id);
-    setDetailsEditMode(true);
     setDetailsOpen(true);
   };
 
   const handleCreateTasksFromPlan = (plan: ContentPlan) => {
     setSelectedPlanId(plan.id);
-    setDetailsEditMode(false);
     setDetailsOpen(true);
   };
 
@@ -203,7 +194,6 @@ export function ContentPlanningList() {
             <ContentPlanCard
               key={plan.id}
               plan={plan}
-              onView={handleViewPlan}
               onEdit={handleEditPlan}
               onCreateTasks={handleCreateTasksFromPlan}
               onDelete={deletePlan}
@@ -244,7 +234,7 @@ export function ContentPlanningList() {
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
         onCreateTasks={createTasksFromItems}
-        editMode={detailsEditMode}
+        
         onUpdateItem={updatePlanItem}
         onDeleteItem={deletePlanItem}
         onAddItem={addPlanItem}

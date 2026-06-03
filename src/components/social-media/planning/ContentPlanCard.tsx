@@ -3,12 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Calendar, Eye, ListChecks, MessageSquareText, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Calendar, ListChecks, MessageSquareText, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { ContentPlan } from "@/hooks/useContentPlanning";
 
 interface ContentPlanCardProps {
   plan: ContentPlan;
-  onView: (plan: ContentPlan) => void;
   onEdit: (plan: ContentPlan) => void;
   onCreateTasks: (plan: ContentPlan) => void;
   onDelete: (planId: string) => void;
@@ -22,7 +21,7 @@ const STATUS_MAP: Record<string, { label: string; className: string }> = {
   archived: { label: "Arquivado", className: "bg-muted text-muted-foreground" },
 };
 
-export function ContentPlanCard({ plan, onView, onEdit, onCreateTasks, onDelete, onCopyWeeklySummary }: ContentPlanCardProps) {
+export function ContentPlanCard({ plan, onEdit, onCreateTasks, onDelete, onCopyWeeklySummary }: ContentPlanCardProps) {
   const items = plan.content_plan_items || [];
   const discarded = items.filter((item) => item.status === "discarded").length;
   const operationalItems = items.filter((item) => item.status !== "discarded");
@@ -39,7 +38,7 @@ export function ContentPlanCard({ plan, onView, onEdit, onCreateTasks, onDelete,
   })();
 
   return (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onView(plan)}>
+    <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onEdit(plan)}>
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -56,9 +55,6 @@ export function ContentPlanCard({ plan, onView, onEdit, onCreateTasks, onDelete,
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={(event) => { event.stopPropagation(); onView(plan); }}>
-                  <Eye className="h-4 w-4 mr-2" />Ver detalhes
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={(event) => { event.stopPropagation(); onEdit(plan); }}>
                   <Pencil className="h-4 w-4 mr-2" />Editar planejamento
                 </DropdownMenuItem>
