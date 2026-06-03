@@ -347,6 +347,7 @@ export function useContentPlanning() {
             platform: item.platform,
             post_type: item.format,
             post_date: item.post_date,
+            due_date: item.due_date ?? item.post_date,
             hashtags: item.hashtags ? item.hashtags.split(",").map((h: string) => h.trim()).filter(Boolean) : null,
             creative_instructions: item.creative_instructions,
             created_by: user.id,
