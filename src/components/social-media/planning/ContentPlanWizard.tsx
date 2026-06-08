@@ -170,10 +170,10 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
       case 1: return data.postsPerWeek > 0;
       case 2: return data.contentTypes.length > 0 && data.formats.length > 0;
       case 3: return true;
-      case 4: return true;
       default: return true;
     }
   };
+
 
   const handleGenerate = () => {
     onGenerate(data);
