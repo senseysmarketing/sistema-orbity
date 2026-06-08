@@ -71,38 +71,47 @@ const WEEKDAYS = [
   { value: "dom", label: "Dom" },
 ];
 
-const STEP_LABELS = ["Contexto", "Frequência", "Estilo", "Direcionamento", "IA"];
+const STEP_LABELS = ["Contexto", "Frequência", "Estilo", "Direcionamento"];
+
+const INITIAL_WIZARD_DATA: WizardData = {
+  clientId: "",
+  clientName: "",
+  niche: "",
+  objectives: [],
+  strategicFocus: "",
+  postsPerWeek: 3,
+  storiesPerWeek: 5,
+  includeInteractive: false,
+  includeHolidays: true,
+  period: "next_month",
+  preferredDays: [],
+  dayDistribution: "",
+  preferredTimes: "",
+  frequencyNotes: "",
+  contentTypes: ["educativo", "autoridade", "conversao"],
+  formats: ["carrossel", "feed", "reels"],
+  voiceTone: "profissional",
+  priorityProduct: "",
+  activeOffer: "",
+  hasLaunch: false,
+  hasAds: false,
+  targetAudience: "",
+  audiencePains: "",
+  depthLevel: "detailed",
+  assignedUserIds: [],
+};
 
 export function ContentPlanWizard({ open, onClose, onGenerate, generating }: ContentPlanWizardProps) {
   const { currentAgency } = useAgency();
   const [step, setStep] = useState(0);
-  const [data, setData] = useState<WizardData>({
-    clientId: "",
-    clientName: "",
-    niche: "",
-    objectives: [],
-    strategicFocus: "",
-    postsPerWeek: 3,
-    storiesPerWeek: 5,
-    includeInteractive: false,
-    includeHolidays: true,
-    period: "next_month",
-    preferredDays: [],
-    dayDistribution: "",
-    preferredTimes: "",
-    frequencyNotes: "",
-    contentTypes: ["educativo", "autoridade", "conversao"],
-    formats: ["carrossel", "feed", "reels"],
-    voiceTone: "profissional",
-    priorityProduct: "",
-    activeOffer: "",
-    hasLaunch: false,
-    hasAds: false,
-    targetAudience: "",
-    audiencePains: "",
-    depthLevel: "detailed",
-    assignedUserIds: [],
-  });
+  const [data, setData] = useState<WizardData>(INITIAL_WIZARD_DATA);
+
+  const handleClose = () => {
+    setStep(0);
+    setData(INITIAL_WIZARD_DATA);
+    onClose();
+  };
+
 
   const { data: agencyUsers = [] } = useQuery({
     queryKey: ["agency-users-planning", currentAgency?.id],
