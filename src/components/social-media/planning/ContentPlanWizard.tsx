@@ -71,38 +71,47 @@ const WEEKDAYS = [
   { value: "dom", label: "Dom" },
 ];
 
-const STEP_LABELS = ["Contexto", "Frequência", "Estilo", "Direcionamento", "IA"];
+const STEP_LABELS = ["Contexto", "Frequência", "Estilo", "Direcionamento"];
+
+const INITIAL_WIZARD_DATA: WizardData = {
+  clientId: "",
+  clientName: "",
+  niche: "",
+  objectives: [],
+  strategicFocus: "",
+  postsPerWeek: 3,
+  storiesPerWeek: 5,
+  includeInteractive: false,
+  includeHolidays: true,
+  period: "next_month",
+  preferredDays: [],
+  dayDistribution: "",
+  preferredTimes: "",
+  frequencyNotes: "",
+  contentTypes: ["educativo", "autoridade", "conversao"],
+  formats: ["carrossel", "feed", "reels"],
+  voiceTone: "profissional",
+  priorityProduct: "",
+  activeOffer: "",
+  hasLaunch: false,
+  hasAds: false,
+  targetAudience: "",
+  audiencePains: "",
+  depthLevel: "detailed",
+  assignedUserIds: [],
+};
 
 export function ContentPlanWizard({ open, onClose, onGenerate, generating }: ContentPlanWizardProps) {
   const { currentAgency } = useAgency();
   const [step, setStep] = useState(0);
-  const [data, setData] = useState<WizardData>({
-    clientId: "",
-    clientName: "",
-    niche: "",
-    objectives: [],
-    strategicFocus: "",
-    postsPerWeek: 3,
-    storiesPerWeek: 5,
-    includeInteractive: false,
-    includeHolidays: true,
-    period: "next_month",
-    preferredDays: [],
-    dayDistribution: "",
-    preferredTimes: "",
-    frequencyNotes: "",
-    contentTypes: ["educativo", "autoridade", "conversao"],
-    formats: ["carrossel", "feed", "reels"],
-    voiceTone: "profissional",
-    priorityProduct: "",
-    activeOffer: "",
-    hasLaunch: false,
-    hasAds: false,
-    targetAudience: "",
-    audiencePains: "",
-    depthLevel: "detailed",
-    assignedUserIds: [],
-  });
+  const [data, setData] = useState<WizardData>(INITIAL_WIZARD_DATA);
+
+  const handleClose = () => {
+    setStep(0);
+    setData(INITIAL_WIZARD_DATA);
+    onClose();
+  };
+
 
   const { data: agencyUsers = [] } = useQuery({
     queryKey: ["agency-users-planning", currentAgency?.id],
@@ -161,10 +170,10 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
       case 1: return data.postsPerWeek > 0;
       case 2: return data.contentTypes.length > 0 && data.formats.length > 0;
       case 3: return true;
-      case 4: return true;
       default: return true;
     }
   };
+
 
   const handleGenerate = () => {
     onGenerate(data);
@@ -411,31 +420,6 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
               <Label>Principais dores do público</Label>
               <Textarea value={data.audiencePains} onChange={(e) => updateField("audiencePains", e.target.value)} placeholder="Ex: Falta de tempo, não sabe como começar..." rows={3} />
             </div>
-          </div>
-        );
-
-      case 4:
-        return (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <Label className="text-base font-semibold">Nível de profundidade</Label>
-
-              <div
-                className={`p-4 rounded-lg border-2 cursor-pointer transition-colors ${data.depthLevel === "summary" ? "border-primary bg-primary/5" : "border-muted hover:border-primary/50"}`}
-                onClick={() => updateField("depthLevel", "summary")}
-              >
-                <p className="font-medium">📋 Planejamento Resumido</p>
-                <p className="text-sm text-muted-foreground mt-1">Roteiro resumido de cada conteúdo — ideal para apresentação ao cliente</p>
-              </div>
-
-              <div
-                className={`p-4 rounded-lg border-2 cursor-pointer transition-colors ${data.depthLevel === "detailed" ? "border-primary bg-primary/5" : "border-muted hover:border-primary/50"}`}
-                onClick={() => updateField("depthLevel", "detailed")}
-              >
-                <p className="font-medium">📝 Planejamento Completo</p>
-                <p className="text-sm text-muted-foreground mt-1">Estrutura completa com instruções criativas, pronto para virar tarefa no sistema</p>
-              </div>
-            </div>
 
             <div className="p-4 rounded-lg bg-muted/50 space-y-2">
               <p className="text-sm font-medium">Resumo do planejamento:</p>
@@ -462,8 +446,9 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
     }
   };
 
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent className="max-w-2xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -472,7 +457,7 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
           </DialogTitle>
         </DialogHeader>
 
-        <WizardStepIndicator currentStep={step + 1} totalSteps={5} stepLabels={STEP_LABELS} />
+        <WizardStepIndicator currentStep={step + 1} totalSteps={STEP_LABELS.length} stepLabels={STEP_LABELS} />
 
         <div className="flex-1 min-h-0">
           <ScrollArea className="h-full px-1">
@@ -482,10 +467,11 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-4 border-t shrink-0">
-          <Button variant="outline" onClick={() => (step > 0 ? setStep(step - 1) : onClose())} disabled={generating}>
+          <Button variant="outline" onClick={() => (step > 0 ? setStep(step - 1) : handleClose())} disabled={generating}>
             <ChevronLeft className="h-4 w-4 mr-1" />
             {step === 0 ? "Cancelar" : "Voltar"}
           </Button>
+
 
           {step < STEP_LABELS.length - 1 ? (
             <Button onClick={() => setStep(step + 1)} disabled={!canProceed()}>
