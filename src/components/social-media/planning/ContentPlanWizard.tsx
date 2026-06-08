@@ -448,7 +448,7 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
 
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent className="max-w-2xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -457,7 +457,7 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
           </DialogTitle>
         </DialogHeader>
 
-        <WizardStepIndicator currentStep={step + 1} totalSteps={5} stepLabels={STEP_LABELS} />
+        <WizardStepIndicator currentStep={step + 1} totalSteps={STEP_LABELS.length} stepLabels={STEP_LABELS} />
 
         <div className="flex-1 min-h-0">
           <ScrollArea className="h-full px-1">
@@ -467,10 +467,11 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-4 border-t shrink-0">
-          <Button variant="outline" onClick={() => (step > 0 ? setStep(step - 1) : onClose())} disabled={generating}>
+          <Button variant="outline" onClick={() => (step > 0 ? setStep(step - 1) : handleClose())} disabled={generating}>
             <ChevronLeft className="h-4 w-4 mr-1" />
             {step === 0 ? "Cancelar" : "Voltar"}
           </Button>
+
 
           {step < STEP_LABELS.length - 1 ? (
             <Button onClick={() => setStep(step + 1)} disabled={!canProceed()}>
