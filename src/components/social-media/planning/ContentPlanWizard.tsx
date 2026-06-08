@@ -420,31 +420,6 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
               <Label>Principais dores do público</Label>
               <Textarea value={data.audiencePains} onChange={(e) => updateField("audiencePains", e.target.value)} placeholder="Ex: Falta de tempo, não sabe como começar..." rows={3} />
             </div>
-          </div>
-        );
-
-      case 4:
-        return (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <Label className="text-base font-semibold">Nível de profundidade</Label>
-
-              <div
-                className={`p-4 rounded-lg border-2 cursor-pointer transition-colors ${data.depthLevel === "summary" ? "border-primary bg-primary/5" : "border-muted hover:border-primary/50"}`}
-                onClick={() => updateField("depthLevel", "summary")}
-              >
-                <p className="font-medium">📋 Planejamento Resumido</p>
-                <p className="text-sm text-muted-foreground mt-1">Roteiro resumido de cada conteúdo — ideal para apresentação ao cliente</p>
-              </div>
-
-              <div
-                className={`p-4 rounded-lg border-2 cursor-pointer transition-colors ${data.depthLevel === "detailed" ? "border-primary bg-primary/5" : "border-muted hover:border-primary/50"}`}
-                onClick={() => updateField("depthLevel", "detailed")}
-              >
-                <p className="font-medium">📝 Planejamento Completo</p>
-                <p className="text-sm text-muted-foreground mt-1">Estrutura completa com instruções criativas, pronto para virar tarefa no sistema</p>
-              </div>
-            </div>
 
             <div className="p-4 rounded-lg bg-muted/50 space-y-2">
               <p className="text-sm font-medium">Resumo do planejamento:</p>
@@ -470,6 +445,7 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
         );
     }
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
