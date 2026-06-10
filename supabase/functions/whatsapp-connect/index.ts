@@ -373,6 +373,16 @@ serve(async (req) => {
       if (!account?.api_key) {
         return json({ success: true, status: 'disconnected' });
       }
+      // Instância externa: NUNCA chamar disconnect na Uazapi.
+      // Apenas remover vínculo local — usuário deve usar manual_detach.
+      if (account.connection_mode === 'external') {
+        await logEvent({ accountId: account.id, action: 'disconnect.blocked_external' });
+        return json({
+          success: false,
+          status: account.status,
+          error: 'Instância externa não pode ser desconectada pela Orbity. Use "Remover vínculo".',
+        }, 200);
+      }
       const res = await disconnectInstance(account.api_key);
       await patchAccount(account.id, {
         status: 'disconnected',
@@ -390,6 +400,15 @@ serve(async (req) => {
       const { data: account } = await admin
         .from('whatsapp_accounts').select('*')
         .eq('agency_id', agencyId).eq('purpose', purpose).maybeSingle();
+      // Instância externa: bloquear hard_reset. Não deletar instância de terceiros.
+      if (account?.connection_mode === 'external') {
+        await logEvent({ accountId: account.id, action: 'hard_reset.blocked_external' });
+        return json({
+          success: false,
+          status: account.status,
+          error: 'Instância externa não pode ser resetada pela Orbity. Use "Remover vínculo".',
+        }, 200);
+      }
       if (account?.api_key) {
         const res = await deleteInstance(account.api_key);
         await logEvent({ accountId: account.id, action: 'hard_reset.delete', response: res });
@@ -405,8 +424,179 @@ serve(async (req) => {
           last_error: null,
           last_provider_payload: null,
           instance_name: instanceNameFor(agencyId, purpose),
+          connection_mode: 'managed',
+          webhook_managed_by_orbity: false,
         });
       }
+      return json({ success: true, status: 'disconnected' });
+    }
+
+    // ===== Modo externo: validar instância sem persistir =====
+    if (action === 'validate_external_instance') {
+      const apiUrl = String(body.api_url || '').trim().replace(/\/$/, '');
+      const apiKey = String(body.api_key || '').trim();
+      if (!apiUrl || !apiKey) {
+        return json({ success: false, error: 'api_url e api_key são obrigatórios.' }, 400);
+      }
+      // Sobrescrever temporariamente apiUrl via injeção: getInstanceStatus usa config global.
+      // Fazemos chamada direta via uazapiRequest se necessário; mas getInstanceStatus já usa env.
+      // Para validação externa, fazemos request direto:
+      const { uazapiRequest } = await import('../_shared/uazapi.ts');
+      const res = await uazapiRequest('/instance/status', { method: 'GET', token: apiKey, apiUrl });
+      const phone = parsePhoneNumber(res.data);
+      const qr = parseQrCode(res.data);
+      const { domain } = parseStatus(res.data, !!qr);
+      await logEvent({
+        accountId: null,
+        action: 'validate_external_instance',
+        response: res,
+        domain,
+        hasToken: true,
+        error: res.ok ? null : `HTTP ${res.status}`,
+      });
+      if (!res.ok) {
+        return json({
+          success: false,
+          status: 'error',
+          error: `Não foi possível validar a instância (HTTP ${res.status}). Verifique URL e token.`,
+        }, 200);
+      }
+      return json({
+        success: true,
+        status: domain,
+        phone_number: phone,
+      });
+    }
+
+    if (action === 'manual_attach') {
+      const apiUrl = String(body.api_url || '').trim().replace(/\/$/, '');
+      const apiKey = String(body.api_key || '').trim();
+      const instanceName = String(body.instance_name || '').trim() || null;
+      const configureWebhookNow = body.configure_webhook === true;
+      if (!apiUrl || !apiKey) {
+        return json({ success: false, error: 'api_url e api_key são obrigatórios.' }, 400);
+      }
+
+      const { uazapiRequest } = await import('../_shared/uazapi.ts');
+      const statusRes = await uazapiRequest('/instance/status', { method: 'GET', token: apiKey, apiUrl });
+      if (!statusRes.ok) {
+        return json({
+          success: false,
+          status: 'error',
+          error: `Instância inválida (HTTP ${statusRes.status}). Verifique URL e token.`,
+        }, 200);
+      }
+      const phone = parsePhoneNumber(statusRes.data);
+      const qr = parseQrCode(statusRes.data);
+      const { domain, raw } = parseStatus(statusRes.data, !!qr);
+
+      // Upsert na conta (managed → external).
+      const { data: existing } = await admin
+        .from('whatsapp_accounts')
+        .select('id')
+        .eq('agency_id', agencyId)
+        .eq('purpose', purpose)
+        .maybeSingle();
+
+      const payload: Record<string, unknown> = {
+        agency_id: agencyId,
+        purpose,
+        provider: 'uazapi',
+        api_url: apiUrl,
+        api_key: apiKey,
+        instance_name: instanceName || `external_${agencyId.replace(/-/g, '').slice(0, 8)}_${purpose}`,
+        status: domain,
+        provider_status: raw,
+        phone_number: phone,
+        qr_code: null,
+        connected_at: domain === 'connected' ? new Date().toISOString() : null,
+        connection_mode: 'external',
+        webhook_managed_by_orbity: false,
+        last_manual_validation_at: new Date().toISOString(),
+        last_error: null,
+      };
+
+      let accountId: string | null = null;
+      if (existing) {
+        const { error } = await admin.from('whatsapp_accounts').update(payload).eq('id', existing.id);
+        if (error) throw new Error(`Falha ao atualizar conta: ${error.message}`);
+        accountId = existing.id;
+      } else {
+        const { data: inserted, error } = await admin
+          .from('whatsapp_accounts')
+          .insert(payload)
+          .select('id')
+          .single();
+        if (error) throw new Error(`Falha ao criar conta: ${error.message}`);
+        accountId = inserted.id;
+      }
+
+      // Webhook opcional: só se solicitado explicitamente.
+      let webhookConfigured = false;
+      if (configureWebhookNow) {
+        try {
+          const whRes = await uazapiRequest('/webhook', {
+            method: 'POST',
+            token: apiKey,
+            apiUrl,
+            body: {
+              url: webhookUrlFor(agencyId),
+              events: ['connection', 'messages', 'messages_update'],
+            },
+          });
+          webhookConfigured = whRes.ok;
+          await logEvent({ accountId, action: 'manual_attach.webhook', response: whRes });
+          if (webhookConfigured) {
+            await admin
+              .from('whatsapp_accounts')
+              .update({ webhook_managed_by_orbity: true })
+              .eq('id', accountId);
+          }
+        } catch (e) {
+          await logEvent({ accountId, action: 'manual_attach.webhook', error: errMsg(e) });
+        }
+      }
+
+      await logEvent({
+        accountId,
+        action: 'manual_attach',
+        response: statusRes,
+        domain,
+        hasToken: true,
+        hasQr: !!qr,
+      });
+
+      return json({
+        success: true,
+        status: domain,
+        phone_number: phone,
+        connection_mode: 'external',
+        webhook_managed_by_orbity: webhookConfigured,
+      });
+    }
+
+    if (action === 'manual_detach') {
+      const { data: account } = await admin
+        .from('whatsapp_accounts').select('*')
+        .eq('agency_id', agencyId).eq('purpose', purpose).maybeSingle();
+      if (!account) {
+        return json({ success: true, status: 'disconnected' });
+      }
+      // NUNCA chama deleteInstance/disconnectInstance: a instância pode estar em uso por outro sistema.
+      await patchAccount(account.id, {
+        api_key: null,
+        qr_code: null,
+        phone_number: null,
+        status: 'disconnected',
+        connected_at: null,
+        provider_status: null,
+        last_error: null,
+        last_provider_payload: null,
+        connection_mode: 'managed',
+        webhook_managed_by_orbity: false,
+        instance_name: instanceNameFor(agencyId, purpose),
+      });
+      await logEvent({ accountId: account.id, action: 'manual_detach', domain: 'disconnected' });
       return json({ success: true, status: 'disconnected' });
     }
 
