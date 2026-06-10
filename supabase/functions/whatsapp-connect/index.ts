@@ -313,11 +313,23 @@ serve(async (req) => {
         return json({ success: true, status: 'disconnected' });
       }
 
-      const statusRes = await getInstanceStatus(account.api_key);
+      // Externo: usa api_url próprio da instância anexada.
+      let statusRes;
+      if (account.connection_mode === 'external' && account.api_url) {
+        const { uazapiRequest } = await import('../_shared/uazapi.ts');
+        statusRes = await uazapiRequest('/instance/status', {
+          method: 'GET', token: account.api_key, apiUrl: account.api_url,
+        });
+      } else {
+        statusRes = await getInstanceStatus(account.api_key);
+      }
       let { patch, domain, qr, phone, error } = applyResponseToPatch(statusRes);
 
-      // Se a Uazapi indica qr_pending mas não devolveu QR no /status, tenta /connect
-      if (domain === 'error' && /QR mas não retornou/.test(error || '')) {
+      // Externo: nunca persistir qr_code nem tentar fallback de connect.
+      if (account.connection_mode === 'external') {
+        delete (patch as any).qr_code;
+        qr = null;
+      } else if (domain === 'error' && /QR mas não retornou/.test(error || '')) {
         const connectRes = await connectInstance(account.api_key);
         ({ patch, domain, qr, phone, error } = applyResponseToPatch(connectRes));
         await logEvent({
@@ -335,8 +347,13 @@ serve(async (req) => {
       return json({
         success: domain !== 'error',
         status: domain,
-        qr_code: qr || (domain === 'qr_pending' ? account.qr_code : null),
+        qr_code: account.connection_mode === 'external' ? null : (qr || (domain === 'qr_pending' ? account.qr_code : null)),
         phone_number: phone || account.phone_number,
+        connection_mode: account.connection_mode,
+        webhook_managed_by_orbity: account.webhook_managed_by_orbity,
+        instance_name: account.instance_name,
+        api_url: account.connection_mode === 'external' ? account.api_url : null,
+        api_key_masked: account.api_key ? `****${String(account.api_key).slice(-4)}` : null,
         error,
       });
     }
