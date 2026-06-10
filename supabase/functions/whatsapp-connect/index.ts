@@ -1,5 +1,6 @@
 // whatsapp-connect: máquina de estados de conexão Uazapi.
 // Escopo restrito: criar/recuperar instância, QR Code, status. Não envia mensagens.
+// v2026.06.10.2 — external instance mode (validate/attach/detach)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
