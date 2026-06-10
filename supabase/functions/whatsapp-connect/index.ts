@@ -239,6 +239,19 @@ serve(async (req) => {
     }
 
     if (action === 'connect') {
+      const existing = await admin
+        .from('whatsapp_accounts')
+        .select('connection_mode')
+        .eq('agency_id', agencyId)
+        .eq('purpose', purpose)
+        .maybeSingle();
+      if (existing.data?.connection_mode === 'external') {
+        return json({
+          success: false,
+          status: 'error',
+          error: 'Esta agência está usando uma instância Uazapi externa. Remova o vínculo antes de conectar uma nova via QR.',
+        }, 200);
+      }
       const account = await getOrCreateAccount();
       await patchAccount(account.id, { status: 'provisioning', last_error: null });
       await logEvent({ accountId: account.id, action: 'connect.start' });
