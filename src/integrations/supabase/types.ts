@@ -7560,11 +7560,13 @@ export type Database = {
           api_key: string
           api_url: string
           connected_at: string | null
+          connection_mode: string
           created_at: string | null
           id: string
           instance_name: string
           last_checked_at: string | null
           last_error: string | null
+          last_manual_validation_at: string | null
           last_provider_payload: Json | null
           phone_number: string | null
           provider: string
@@ -7574,6 +7576,7 @@ export type Database = {
           sending_schedule: Json | null
           status: string | null
           updated_at: string | null
+          webhook_managed_by_orbity: boolean
         }
         Insert: {
           agency_id: string
@@ -7581,11 +7584,13 @@ export type Database = {
           api_key?: string
           api_url?: string
           connected_at?: string | null
+          connection_mode?: string
           created_at?: string | null
           id?: string
           instance_name: string
           last_checked_at?: string | null
           last_error?: string | null
+          last_manual_validation_at?: string | null
           last_provider_payload?: Json | null
           phone_number?: string | null
           provider?: string
@@ -7595,6 +7600,7 @@ export type Database = {
           sending_schedule?: Json | null
           status?: string | null
           updated_at?: string | null
+          webhook_managed_by_orbity?: boolean
         }
         Update: {
           agency_id?: string
@@ -7602,11 +7608,13 @@ export type Database = {
           api_key?: string
           api_url?: string
           connected_at?: string | null
+          connection_mode?: string
           created_at?: string | null
           id?: string
           instance_name?: string
           last_checked_at?: string | null
           last_error?: string | null
+          last_manual_validation_at?: string | null
           last_provider_payload?: Json | null
           phone_number?: string | null
           provider?: string
@@ -7616,6 +7624,7 @@ export type Database = {
           sending_schedule?: Json | null
           status?: string | null
           updated_at?: string | null
+          webhook_managed_by_orbity?: boolean
         }
         Relationships: [
           {
