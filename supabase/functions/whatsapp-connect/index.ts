@@ -1,5 +1,6 @@
 // whatsapp-connect: máquina de estados de conexão Uazapi.
 // Escopo restrito: criar/recuperar instância, QR Code, status. Não envia mensagens.
+// v2026.06.10.2 — external instance mode (validate/attach/detach)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -486,22 +487,27 @@ serve(async (req) => {
     }
 
     if (action === 'manual_attach') {
-      const apiUrl = String(body.api_url || '').trim().replace(/\/$/, '');
+      let apiUrl = String(body.api_url || '').trim().replace(/\/$/, '');
       const apiKey = String(body.api_key || '').trim();
       const instanceName = String(body.instance_name || '').trim() || null;
       const configureWebhookNow = body.configure_webhook === true;
       if (!apiUrl || !apiKey) {
-        return json({ success: false, error: 'api_url e api_key são obrigatórios.' }, 400);
+        return json({ success: false, error: 'URL e token são obrigatórios.' }, 400);
+      }
+      if (!/^https?:\/\//i.test(apiUrl)) apiUrl = `https://${apiUrl}`;
+      if (apiKey.length < 10) {
+        return json({ success: false, error: 'Token parece inválido (muito curto).' }, 400);
       }
 
       const { uazapiRequest } = await import('../_shared/uazapi.ts');
       const statusRes = await uazapiRequest('/instance/status', { method: 'GET', token: apiKey, apiUrl });
       if (!statusRes.ok) {
+        const detail = typeof statusRes.data?.error === 'string' ? statusRes.data.error : `HTTP ${statusRes.status}`;
         return json({
           success: false,
           status: 'error',
-          error: `Instância inválida (HTTP ${statusRes.status}). Verifique URL e token.`,
-        }, 200);
+          error: `Instância inválida (${detail}). Verifique URL e token.`,
+        }, 400);
       }
       const phone = parsePhoneNumber(statusRes.data);
       const qr = parseQrCode(statusRes.data);
