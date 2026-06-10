@@ -98,9 +98,9 @@ export function useWhatsAppConnection(purpose: 'general' | 'billing' = 'general'
     refetchOnWindowFocus: false,
   });
 
-  function makeMutation(action: Exclude<Action, 'status' | 'debug_health'>, successMsg?: string) {
+  function makeMutation(action: Exclude<Action, 'status' | 'debug_health' | 'validate_external_instance' | 'manual_attach' | 'manual_detach'>, successMsg?: string) {
     return {
-      mutationFn: (payload?: Record<string, unknown>) => invoke(action, payload ?? {}),
+      mutationFn: (payload: Record<string, unknown> | void) => invoke(action, payload ?? {}),
       onSuccess: (data: WhatsAppConnectionState) => {
         queryClient.setQueryData(queryKey, data);
         if (successMsg) toast({ title: successMsg });
