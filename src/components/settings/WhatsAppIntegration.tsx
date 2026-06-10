@@ -3,8 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Loader2, Link2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { WhatsAppInstanceCard } from "./WhatsAppInstanceCard";
 import { useToast } from "@/hooks/use-toast";
 
