@@ -50,26 +50,6 @@ export const WhatsAppIntegration = () => {
     },
   });
 
-  // Re-link orphan WhatsApp conversations to leads (manual sync)
-  const relinkOrphans = useMutation({
-    mutationFn: async () => {
-      if (!currentAgency?.id) throw new Error('No agency');
-      const { data, error } = await supabase.rpc('relink_orphan_whatsapp_conversations', {
-        p_agency_id: currentAgency.id,
-      });
-      if (error) throw error;
-      return (data as any)?.[0] ?? { linked_count: 0, total_orphans: 0 };
-    },
-    onSuccess: (result: { linked_count: number; total_orphans: number }) => {
-      toast({
-        title: 'Sincronização concluída',
-        description: `${result.linked_count} de ${result.total_orphans} conversas órfãs foram vinculadas a leads.`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({ title: 'Erro ao sincronizar', description: error.message, variant: 'destructive' });
-    },
-  });
 
   if (isLoadingSettings) {
     return (
@@ -120,29 +100,6 @@ export const WhatsAppIntegration = () => {
           description="Conecte seu WhatsApp para automação de mensagens no CRM"
         />
       )}
-
-      {/* Manual re-link tool for orphan conversations */}
-      <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/10">
-        <div className="space-y-0.5">
-          <Label className="text-sm font-medium">Sincronizar conversas com leads</Label>
-          <p className="text-xs text-muted-foreground">
-            Vincula conversas recebidas no WhatsApp aos leads correspondentes pelo número de telefone. Útil quando mensagens chegaram antes do lead ter sido cadastrado.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => relinkOrphans.mutate()}
-          disabled={relinkOrphans.isPending}
-        >
-          {relinkOrphans.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Link2 className="mr-2 h-4 w-4" />
-          )}
-          Sincronizar agora
-        </Button>
-      </div>
     </div>
   );
 };
