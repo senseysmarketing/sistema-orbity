@@ -100,7 +100,7 @@ export function useWhatsAppConnection(purpose: 'general' | 'billing' = 'general'
 
   function makeMutation(action: Exclude<Action, 'status' | 'debug_health' | 'validate_external_instance' | 'manual_attach' | 'manual_detach'>, successMsg?: string) {
     return {
-      mutationFn: (payload?: Record<string, unknown>) => invoke(action, payload ?? {}),
+      mutationFn: () => invoke(action),
       onSuccess: (data: WhatsAppConnectionState) => {
         queryClient.setQueryData(queryKey, data);
         if (successMsg) toast({ title: successMsg });
