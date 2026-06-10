@@ -24,7 +24,16 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-type Action = 'debug_health' | 'connect' | 'status' | 'refresh_qr' | 'disconnect' | 'hard_reset';
+type Action =
+  | 'debug_health'
+  | 'connect'
+  | 'status'
+  | 'refresh_qr'
+  | 'disconnect'
+  | 'hard_reset'
+  | 'validate_external_instance'
+  | 'manual_attach'
+  | 'manual_detach';
 type Purpose = 'general' | 'billing';
 
 function json(body: Record<string, unknown>, status = 200) {
