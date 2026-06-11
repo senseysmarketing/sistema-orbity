@@ -531,6 +531,17 @@ export function useContentPlanning() {
       platforms: string[];
       contentTypes?: string[];
       formats?: string[];
+      startDate?: string;
+      weekdays?: number[]; // 0=Dom..6=Sab
+      objective?: string;
+      tone?: string;
+      toneCustom?: string;
+      audience?: string;
+      pillars?: string[];
+      mixDistribution?: string;
+      allowSalesCta?: boolean;
+      avoid?: string;
+      references?: string;
     }
   ): Promise<AIPlanResult["items"] | null> => {
     setGenerating(true);
@@ -542,11 +553,43 @@ export function useContentPlanning() {
         post_date: i.post_date,
       }));
 
-      const today = new Date();
-      const start = today.toISOString().substring(0, 10);
-      const endDate = new Date(today);
-      endDate.setDate(endDate.getDate() + params.periodDays);
-      const end = endDate.toISOString().substring(0, 10);
+      const startStr = params.startDate || new Date().toISOString().substring(0, 10);
+      const startDate = new Date(`${startStr}T00:00:00`);
+      const endDateObj = new Date(startDate);
+      endDateObj.setDate(endDateObj.getDate() + params.periodDays);
+      const end = endDateObj.toISOString().substring(0, 10);
+
+      const weekdayNames = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
+      const allowedDays = params.weekdays && params.weekdays.length > 0
+        ? params.weekdays.map((d) => weekdayNames[d]).join(", ")
+        : "qualquer dia";
+
+      const strategyCtx = (plan.strategy_context || {}) as Record<string, unknown>;
+
+      const briefingLines = [
+        `Plano: "${plan.title}" (cliente: ${plan.clients?.name || "n/d"})`,
+        strategyCtx.notes ? `Estrategia do plano: ${strategyCtx.notes}` : null,
+        strategyCtx.strategicFocus ? `Foco estrategico do plano: ${strategyCtx.strategicFocus}` : null,
+        strategyCtx.targetAudience ? `Publico do plano: ${strategyCtx.targetAudience}` : null,
+        "",
+        "BRIEFING DESTA GERACAO:",
+        `- Quantidade: ${params.itemsCount} conteudos`,
+        `- Janela: ${startStr} ate ${end}`,
+        `- Dias permitidos: ${allowedDays}`,
+        `- Plataformas: ${params.platforms.join(", ")}`,
+        params.formats?.length ? `- Formatos preferidos: ${params.formats.join(", ")}` : null,
+        params.objective ? `- Objetivo principal: ${params.objective}` : null,
+        params.tone ? `- Tom de voz: ${params.tone}${params.toneCustom ? ` (${params.toneCustom})` : ""}` : null,
+        params.audience ? `- Publico-alvo: ${params.audience}` : null,
+        params.pillars?.length ? `- Pilares de conteudo: ${params.pillars.join(", ")}` : null,
+        params.mixDistribution ? `- Mix sugerido: ${params.mixDistribution}` : null,
+        typeof params.allowSalesCta === "boolean"
+          ? `- CTA de venda direta: ${params.allowSalesCta ? "permitido" : "NAO permitido - evite posts de venda direta"}`
+          : null,
+        params.focus ? `- Tema desta leva: ${params.focus}` : null,
+        params.avoid ? `- EVITAR: ${params.avoid}` : null,
+        params.references ? `- Referencias/concorrentes: ${params.references}` : null,
+      ].filter(Boolean).join("\n");
 
       const payload = {
         mode: "append",
@@ -558,10 +601,21 @@ export function useContentPlanning() {
         contentTypes: params.contentTypes || [],
         formats: params.formats || [],
         period: "custom",
-        customStartDate: start,
+        customStartDate: startStr,
         customEndDate: end,
+        preferredWeekdays: params.weekdays || [],
+        objective: params.objective || null,
+        voiceTone: params.tone || null,
+        voiceToneCustom: params.toneCustom || null,
+        targetAudience: params.audience || null,
+        pillars: params.pillars || [],
+        mixDistribution: params.mixDistribution || null,
+        allowSalesCta: params.allowSalesCta ?? true,
+        avoid: params.avoid || null,
+        references: params.references || null,
         existing_items: existing,
-        instructions: `Gere EXATAMENTE ${params.itemsCount} novos conteudos para complementar o planejamento existente "${plan.title}". Distribua as datas entre ${start} e ${end}. Evite repetir temas dos conteudos ja planejados. Varie formatos e tipos de conteudo.`,
+        briefing_summary: briefingLines,
+        instructions: `Gere EXATAMENTE ${params.itemsCount} novos conteudos para complementar o planejamento "${plan.title}". Distribua post_date apenas entre ${startStr} e ${end} e somente nos dias permitidos (${allowedDays}). NAO repita temas/titulos dos conteudos ja planejados. Respeite formatos, pilares, objetivo, tom de voz e restricoes do briefing acima. NUNCA escreva legenda/copy final - apenas titulo curto e descricao operacional do conteudo.`,
       };
 
       const { data, error } = await supabase.functions.invoke("ai-assist", {
