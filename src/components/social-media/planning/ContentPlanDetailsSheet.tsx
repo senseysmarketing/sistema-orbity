@@ -239,12 +239,18 @@ export function ContentPlanDetailsSheet({
                 </SelectContent>
               </Select>
 
-              {onAddItem && (
-                <Button variant="outline" size="sm" onClick={handleAddItem}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Adicionar conteudo
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setAiDialogOpen(true)} disabled={!plan}>
+                  <Sparkles className="mr-2 h-4 w-4 text-primary" />
+                  IA
                 </Button>
-              )}
+                {onAddItem && (
+                  <Button variant="outline" size="sm" onClick={handleAddItem}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Adicionar conteudo
+                  </Button>
+                )}
+              </div>
             </div>
 
             {pendingItems.length > 0 && (
