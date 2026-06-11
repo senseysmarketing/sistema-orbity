@@ -372,6 +372,12 @@ export function ContentPlanDetailsSheet({
         planItems={items}
         planStrategy={strategyText}
       />
+
+      <AIGenerateItemsDialog
+        plan={plan}
+        open={aiDialogOpen}
+        onOpenChange={setAiDialogOpen}
+      />
     </>
   );
 }
