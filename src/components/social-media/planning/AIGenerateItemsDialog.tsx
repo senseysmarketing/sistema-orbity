@@ -161,36 +161,6 @@ export function AIGenerateItemsDialog({ plan, open, onOpenChange }: AIGenerateIt
     });
   };
 
-  const Section = ({
-    label,
-    hint,
-    open: sectionOpen,
-    onToggle,
-    children,
-  }: {
-    label: string;
-    hint?: string;
-    open: boolean;
-    onToggle: (v: boolean) => void;
-    children: React.ReactNode;
-  }) => (
-    <Collapsible open={sectionOpen} onOpenChange={onToggle} className="border rounded-md">
-      <CollapsibleTrigger type="button" className="w-full p-3 hover:bg-muted/50 rounded-md text-left">
-        <div className="flex items-center justify-between w-full gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium">{label}</p>
-            {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
-          </div>
-          {sectionOpen ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-          )}
-        </div>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
-    </Collapsible>
-  );
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
