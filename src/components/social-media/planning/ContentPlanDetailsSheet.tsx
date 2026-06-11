@@ -79,6 +79,7 @@ export function ContentPlanDetailsSheet({
   const [assignedUserIds, setAssignedUserIds] = useState<string[]>([]);
   const [editingItem, setEditingItem] = useState<ContentPlanItem | null>(null);
   const [filter, setFilter] = useState<ItemFilter>("all");
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const { currentAgency } = useAgency();
   const navigate = useNavigate();
 
