@@ -447,7 +447,7 @@ export function AIGenerateItemsDialog({ plan, open, onOpenChange }: AIGenerateIt
           </div>
         )}
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 px-6 pb-6 pt-2 border-t">
           {step === "preview" && (
             <Button variant="outline" onClick={() => setStep("form")} disabled={saving}>
               <ArrowLeft className="mr-2 h-4 w-4" />
