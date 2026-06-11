@@ -7,10 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sparkles, Loader2, ArrowLeft, ChevronDown } from "lucide-react";
+import { Sparkles, Loader2, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { ContentPlan, useContentPlanning, AIPlanResult } from "@/hooks/useContentPlanning";
 
 interface AIGenerateItemsDialogProps {
@@ -161,32 +161,55 @@ export function AIGenerateItemsDialog({ plan, open, onOpenChange }: AIGenerateIt
     });
   };
 
-  const SectionHeader = ({ label }: { label: string }) => (
-    <div className="flex items-center justify-between w-full text-sm font-medium">
-      <span>{label}</span>
-      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform data-[state=open]:rotate-180" />
-    </div>
+  const Section = ({
+    label,
+    hint,
+    open: sectionOpen,
+    onToggle,
+    children,
+  }: {
+    label: string;
+    hint?: string;
+    open: boolean;
+    onToggle: (v: boolean) => void;
+    children: React.ReactNode;
+  }) => (
+    <Collapsible open={sectionOpen} onOpenChange={onToggle} className="border rounded-md">
+      <CollapsibleTrigger type="button" className="w-full p-3 hover:bg-muted/50 rounded-md text-left">
+        <div className="flex items-center justify-between w-full gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{label}</p>
+            {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
+          </div>
+          {sectionOpen ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+          )}
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
+    </Collapsible>
   );
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[92vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6">
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
             Gerar conteudos com IA
           </DialogTitle>
           <DialogDescription>
             {step === "form"
-              ? "Quanto mais contexto voce der, melhores os conteudos gerados."
+              ? "Quanto mais contexto, melhor o resultado."
               : `${generatedItems.length} conteudos gerados. Selecione os que deseja adicionar.`}
           </DialogDescription>
         </DialogHeader>
 
         {step === "form" && (
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-5 pb-2">
-              {/* Basico */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-6">
+            <div className="space-y-4 py-2 pb-4">
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -214,29 +237,30 @@ export function AIGenerateItemsDialog({ plan, open, onOpenChange }: AIGenerateIt
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Data de inicio</Label>
-                  <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Dias da semana permitidos</Label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {WEEKDAYS.map((d) => {
-                      const active = weekdays.includes(d.value);
-                      return (
-                        <button
-                          key={d.value}
-                          type="button"
-                          onClick={() => toggleFromList(weekdays, setWeekdays, d.value)}
-                          className={`px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
-                            active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
-                          }`}
-                        >
-                          {d.label}
-                        </button>
-                      );
-                    })}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Data de inicio</Label>
+                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Dias permitidos</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {WEEKDAYS.map((d) => {
+                        const active = weekdays.includes(d.value);
+                        return (
+                          <button
+                            key={d.value}
+                            type="button"
+                            onClick={() => toggleFromList(weekdays, setWeekdays, d.value)}
+                            className={`px-2.5 py-1.5 rounded-md border text-xs font-medium transition-colors ${
+                              active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
@@ -261,152 +285,144 @@ export function AIGenerateItemsDialog({ plan, open, onOpenChange }: AIGenerateIt
                 </div>
               </div>
 
-              {/* Briefing estrategico */}
-              <Collapsible open={briefingOpen} onOpenChange={setBriefingOpen} className="border rounded-md">
-                <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 rounded-md">
-                  <SectionHeader label="Briefing estrategico (recomendado)" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="px-3 pb-3 space-y-3">
+              <Section
+                label="Briefing"
+                hint="Tema, objetivo, tom, publico e pilares de conteudo."
+                open={briefingOpen}
+                onToggle={setBriefingOpen}
+              >
+                <Textarea
+                  value={focus}
+                  onChange={(e) => setFocus(e.target.value)}
+                  placeholder="Tema desta leva. Ex: campanha de Black Friday, lancamento do curso X..."
+                  rows={2}
+                />
+
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>Tema / foco desta leva</Label>
-                    <Textarea
-                      value={focus}
-                      onChange={(e) => setFocus(e.target.value)}
-                      placeholder="Ex: campanha de Black Friday, lancamento do curso X, autoridade em nutricao..."
-                      rows={2}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Objetivo principal</Label>
-                      <Select value={objective} onValueChange={setObjective}>
-                        <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                        <SelectContent>
-                          {OBJECTIVES.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Tom de voz</Label>
-                      <Select value={tone} onValueChange={setTone}>
-                        <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                        <SelectContent>
-                          {TONES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {tone === "Outro" && (
-                    <Input
-                      value={toneCustom}
-                      onChange={(e) => setToneCustom(e.target.value)}
-                      placeholder="Descreva o tom desejado"
-                    />
-                  )}
-
-                  <div className="space-y-2">
-                    <Label>Publico-alvo</Label>
-                    <Textarea
-                      value={audience}
-                      onChange={(e) => setAudience(e.target.value)}
-                      placeholder="Ex: donas de clinica de estetica, 30-45 anos, no interior de SP"
-                      rows={2}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Pilares de conteudo (separe por virgula)</Label>
-                    <Input
-                      value={pillarsInput}
-                      onChange={(e) => setPillarsInput(e.target.value)}
-                      placeholder="Ex: bastidores, dicas, prova social, ofertas"
-                    />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Formatos e mix */}
-              <Collapsible open={formatsOpen} onOpenChange={setFormatsOpen} className="border rounded-md">
-                <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 rounded-md">
-                  <SectionHeader label="Formatos e mix" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="px-3 pb-3 space-y-3">
-                  <div className="space-y-2">
-                    <Label>Formatos desejados</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {FORMATS.map((f) => (
-                        <label
-                          key={f}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm cursor-pointer transition-colors ${
-                            formats.includes(f) ? "bg-primary/10 border-primary text-primary" : "bg-background"
-                          }`}
-                        >
-                          <Checkbox
-                            checked={formats.includes(f)}
-                            onCheckedChange={() => toggleFromList(formats, setFormats, f)}
-                          />
-                          {f}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Distribuicao sugerida (texto livre)</Label>
-                    <Input
-                      value={mixDistribution}
-                      onChange={(e) => setMixDistribution(e.target.value)}
-                      placeholder="Ex: 60% educativo, 30% vendas, 10% bastidores"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between rounded-md border p-3">
-                    <div className="space-y-0.5">
-                      <Label>Permitir CTAs de venda direta</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Quando desligado, a IA evita posts puramente comerciais.
-                      </p>
-                    </div>
-                    <Switch checked={allowSalesCta} onCheckedChange={setAllowSalesCta} />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Restricoes */}
-              <Collapsible open={restrictionsOpen} onOpenChange={setRestrictionsOpen} className="border rounded-md">
-                <CollapsibleTrigger className="w-full p-3 hover:bg-muted/50 rounded-md">
-                  <SectionHeader label="Restricoes e referencias" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="px-3 pb-3 space-y-3">
-                  <div className="space-y-2">
-                    <Label>Evitar (temas / palavras / abordagens)</Label>
-                    <Textarea
-                      value={avoid}
-                      onChange={(e) => setAvoid(e.target.value)}
-                      placeholder="Ex: nao falar de concorrente X, evitar promessas medicas"
-                      rows={2}
-                    />
+                    <Label>Objetivo principal</Label>
+                    <Select value={objective} onValueChange={setObjective}>
+                      <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                      <SelectContent>
+                        {OBJECTIVES.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Referencias / concorrentes</Label>
-                    <Textarea
-                      value={references}
-                      onChange={(e) => setReferences(e.target.value)}
-                      placeholder="Ex: estilo do perfil @exemplo, conteudo similar a marca Y"
-                      rows={2}
-                    />
+                    <Label>Tom de voz</Label>
+                    <Select value={tone} onValueChange={setTone}>
+                      <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                      <SelectContent>
+                        {TONES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
+                </div>
+
+                {tone === "Outro" && (
+                  <Input
+                    value={toneCustom}
+                    onChange={(e) => setToneCustom(e.target.value)}
+                    placeholder="Descreva o tom desejado"
+                  />
+                )}
+
+                <div className="space-y-2">
+                  <Label>Publico-alvo</Label>
+                  <Textarea
+                    value={audience}
+                    onChange={(e) => setAudience(e.target.value)}
+                    placeholder="Ex: donas de clinica de estetica, 30-45 anos, no interior de SP"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Pilares</Label>
+                  <Input
+                    value={pillarsInput}
+                    onChange={(e) => setPillarsInput(e.target.value)}
+                    placeholder="Ex: bastidores, dicas, prova social, ofertas"
+                  />
+                  <p className="text-xs text-muted-foreground">Separe por virgula.</p>
+                </div>
+              </Section>
+
+              <Section
+                label="Formatos"
+                hint="Tipos de post desejados, mix por categoria e CTAs comerciais."
+                open={formatsOpen}
+                onToggle={setFormatsOpen}
+              >
+                <div className="flex flex-wrap gap-2">
+                  {FORMATS.map((f) => (
+                    <label
+                      key={f}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm cursor-pointer transition-colors ${
+                        formats.includes(f) ? "bg-primary/10 border-primary text-primary" : "bg-background"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={formats.includes(f)}
+                        onCheckedChange={() => toggleFromList(formats, setFormats, f)}
+                      />
+                      {f}
+                    </label>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Mix sugerido</Label>
+                  <Input
+                    value={mixDistribution}
+                    onChange={(e) => setMixDistribution(e.target.value)}
+                    placeholder="Ex: 60% educativo, 30% vendas, 10% bastidores"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div className="space-y-0.5">
+                    <Label>Permitir CTAs de venda direta</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Quando desligado, a IA evita posts puramente comerciais.
+                    </p>
+                  </div>
+                  <Switch checked={allowSalesCta} onCheckedChange={setAllowSalesCta} />
+                </div>
+              </Section>
+
+              <Section
+                label="Restricoes"
+                hint="O que evitar e referencias de estilo."
+                open={restrictionsOpen}
+                onToggle={setRestrictionsOpen}
+              >
+                <div className="space-y-2">
+                  <Label>O que evitar</Label>
+                  <Textarea
+                    value={avoid}
+                    onChange={(e) => setAvoid(e.target.value)}
+                    placeholder="Ex: nao falar de concorrente X, evitar promessas medicas"
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Referencias</Label>
+                  <Textarea
+                    value={references}
+                    onChange={(e) => setReferences(e.target.value)}
+                    placeholder="Ex: estilo do perfil @exemplo, conteudo similar a marca Y"
+                    rows={2}
+                  />
+                </div>
+              </Section>
             </div>
-          </ScrollArea>
+          </div>
         )}
 
         {step === "preview" && (
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-2">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6">
+            <div className="space-y-2 py-2 pb-4">
               {generatedItems.map((item, i) => (
                 <div
                   key={i}
@@ -428,10 +444,10 @@ export function AIGenerateItemsDialog({ plan, open, onOpenChange }: AIGenerateIt
                 </div>
               ))}
             </div>
-          </ScrollArea>
+          </div>
         )}
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 px-6 pb-6 pt-2 border-t">
           {step === "preview" && (
             <Button variant="outline" onClick={() => setStep("form")} disabled={saving}>
               <ArrowLeft className="mr-2 h-4 w-4" />
