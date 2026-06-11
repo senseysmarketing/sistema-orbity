@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sparkles, Loader2, ArrowLeft, ChevronDown } from "lucide-react";
+import { Sparkles, Loader2, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { ContentPlan, useContentPlanning, AIPlanResult } from "@/hooks/useContentPlanning";
 
 interface AIGenerateItemsDialogProps {
