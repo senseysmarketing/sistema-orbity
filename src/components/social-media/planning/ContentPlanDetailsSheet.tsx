@@ -9,10 +9,11 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Archive, Calendar, CheckCircle2, Copy, ExternalLink, ListChecks, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { Archive, Calendar, CheckCircle2, Copy, ExternalLink, ListChecks, Loader2, Pencil, Plus, Sparkles, Trash2, Users } from "lucide-react";
 import { ContentPlan, ContentPlanItem } from "@/hooks/useContentPlanning";
 import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 import { ContentPlanItemEditDialog } from "./ContentPlanItemEditDialog";
+import { AIGenerateItemsDialog } from "./AIGenerateItemsDialog";
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -78,6 +79,7 @@ export function ContentPlanDetailsSheet({
   const [assignedUserIds, setAssignedUserIds] = useState<string[]>([]);
   const [editingItem, setEditingItem] = useState<ContentPlanItem | null>(null);
   const [filter, setFilter] = useState<ItemFilter>("all");
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const { currentAgency } = useAgency();
   const navigate = useNavigate();
 
@@ -237,12 +239,18 @@ export function ContentPlanDetailsSheet({
                 </SelectContent>
               </Select>
 
-              {onAddItem && (
-                <Button variant="outline" size="sm" onClick={handleAddItem}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Adicionar conteudo
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setAiDialogOpen(true)} disabled={!plan}>
+                  <Sparkles className="mr-2 h-4 w-4 text-primary" />
+                  IA
                 </Button>
-              )}
+                {onAddItem && (
+                  <Button variant="outline" size="sm" onClick={handleAddItem}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Adicionar conteudo
+                  </Button>
+                )}
+              </div>
             </div>
 
             {pendingItems.length > 0 && (
@@ -363,6 +371,12 @@ export function ContentPlanDetailsSheet({
         onSave={handleSaveItem}
         planItems={items}
         planStrategy={strategyText}
+      />
+
+      <AIGenerateItemsDialog
+        plan={plan}
+        open={aiDialogOpen}
+        onOpenChange={setAiDialogOpen}
       />
     </>
   );

@@ -522,6 +522,129 @@ export function useContentPlanning() {
     });
   };
 
+  const generateItemsForPlan = async (
+    plan: ContentPlan,
+    params: {
+      itemsCount: number;
+      focus?: string;
+      periodDays: number;
+      platforms: string[];
+      contentTypes?: string[];
+      formats?: string[];
+    }
+  ): Promise<AIPlanResult["items"] | null> => {
+    setGenerating(true);
+    try {
+      const existing = (plan.content_plan_items || []).map((i) => ({
+        title: i.title,
+        format: i.format,
+        platform: i.platform,
+        post_date: i.post_date,
+      }));
+
+      const today = new Date();
+      const start = today.toISOString().substring(0, 10);
+      const endDate = new Date(today);
+      endDate.setDate(endDate.getDate() + params.periodDays);
+      const end = endDate.toISOString().substring(0, 10);
+
+      const payload = {
+        mode: "append",
+        clientId: plan.client_id,
+        clientName: plan.clients?.name || "",
+        items_count: params.itemsCount,
+        strategicFocus: params.focus || "",
+        platforms: params.platforms,
+        contentTypes: params.contentTypes || [],
+        formats: params.formats || [],
+        period: "custom",
+        customStartDate: start,
+        customEndDate: end,
+        existing_items: existing,
+        instructions: `Gere EXATAMENTE ${params.itemsCount} novos conteudos para complementar o planejamento existente "${plan.title}". Distribua as datas entre ${start} e ${end}. Evite repetir temas dos conteudos ja planejados. Varie formatos e tipos de conteudo.`,
+      };
+
+      const { data, error } = await supabase.functions.invoke("ai-assist", {
+        body: {
+          type: "content_planning",
+          content: JSON.stringify(payload),
+          agency_id: currentAgency?.id,
+        },
+      });
+
+      if (error) {
+        const msg = error.message || "";
+        if (msg.includes("429")) {
+          toast({ title: "Limite de requisicoes", description: "Tente novamente em alguns segundos.", variant: "destructive" });
+        } else if (msg.includes("402")) {
+          toast({ title: "Creditos esgotados", description: "Adicione creditos de IA ao workspace.", variant: "destructive" });
+        } else {
+          toast({ title: "Erro na IA", description: "Nao foi possivel gerar conteudos.", variant: "destructive" });
+        }
+        return null;
+      }
+
+      if (data?.error) {
+        toast({ title: "Erro", description: data.error, variant: "destructive" });
+        return null;
+      }
+
+      const result = data?.result as AIPlanResult;
+      return result?.items || [];
+    } catch (e) {
+      console.error("generateItemsForPlan error:", e);
+      toast({ title: "Erro", description: "Falha ao conectar com a IA.", variant: "destructive" });
+      return null;
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const appendItemsToPlan = async (
+    planId: string,
+    items: AIPlanResult["items"]
+  ): Promise<boolean> => {
+    if (!items?.length) return false;
+    try {
+      const { data: existingItems } = await supabase
+        .from("content_plan_items")
+        .select("order_position")
+        .eq("plan_id", planId)
+        .order("order_position", { ascending: false })
+        .limit(1);
+
+      const startPosition = (existingItems?.[0]?.order_position ?? -1) + 1;
+
+      const rows = items.map((item, index) => ({
+        plan_id: planId,
+        day_number: item.day_number ?? null,
+        order_position: startPosition + index,
+        post_date: item.post_date || null,
+        due_date: item.post_date || null,
+        title: item.title,
+        description: item.description || null,
+        content_type: item.content_type || null,
+        format: item.format || null,
+        platform: item.platform || null,
+        creative_instructions: item.creative_instructions || null,
+        objective: item.objective || null,
+        hashtags: item.hashtags || null,
+        status: "planned",
+      }));
+
+      const { error } = await supabase.from("content_plan_items").insert(rows);
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ["content-plans"] });
+      toast({ title: "Conteudos adicionados!", description: `${rows.length} conteudos gerados por IA.` });
+      return true;
+    } catch (e) {
+      console.error("appendItemsToPlan error:", e);
+      toast({ title: "Erro", description: "Falha ao adicionar conteudos.", variant: "destructive" });
+      return false;
+    }
+  };
+
   return {
     plans,
     isLoading,
@@ -535,5 +658,7 @@ export function useContentPlanning() {
     deletePlanItem,
     addPlanItem,
     duplicatePlanItem,
+    generateItemsForPlan,
+    appendItemsToPlan,
   };
 }
