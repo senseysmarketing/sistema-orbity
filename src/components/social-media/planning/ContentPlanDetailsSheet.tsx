@@ -9,10 +9,11 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Archive, Calendar, CheckCircle2, Copy, ExternalLink, ListChecks, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { Archive, Calendar, CheckCircle2, Copy, ExternalLink, ListChecks, Loader2, Pencil, Plus, Sparkles, Trash2, Users } from "lucide-react";
 import { ContentPlan, ContentPlanItem } from "@/hooks/useContentPlanning";
 import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 import { ContentPlanItemEditDialog } from "./ContentPlanItemEditDialog";
+import { AIGenerateItemsDialog } from "./AIGenerateItemsDialog";
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
 
