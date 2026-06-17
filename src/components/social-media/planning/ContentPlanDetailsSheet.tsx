@@ -281,7 +281,7 @@ export function ContentPlanDetailsSheet({
                   const isPending = item.status === "planned" && !item.task_id;
                   const statusInfo = STATUS_BADGES[item.status] || STATUS_BADGES.planned;
                   return (
-                    <div key={item.id} className={`p-3 rounded-md border bg-card ${isPending && selectedItems.has(item.id) ? "border-primary/40 bg-primary/5" : ""}`}>
+                    <div key={item.id} className={`p-3 rounded-md border bg-card overflow-hidden ${isPending && selectedItems.has(item.id) ? "border-primary/40 bg-primary/5" : ""}`}>
                       <div className="flex items-start gap-2">
                         {isPending ? (
                           <Checkbox checked={selectedItems.has(item.id)} onCheckedChange={() => toggleItem(item.id)} className="mt-0.5" />
@@ -289,9 +289,9 @@ export function ContentPlanDetailsSheet({
                           <CheckCircle2 className={`h-4 w-4 mt-0.5 shrink-0 ${item.status === "discarded" ? "text-muted-foreground" : "text-green-500"}`} />
                         )}
 
-                        <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <p className="text-sm font-medium mr-auto">{item.title}</p>
+                            <p className="text-sm font-medium truncate">{item.title}</p>
                             <Badge className={`text-[10px] ${statusInfo.className}`}>{statusInfo.label}</Badge>
                           </div>
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -304,8 +304,8 @@ export function ContentPlanDetailsSheet({
                             {item.format && <Badge className={`text-[10px] ${FORMAT_COLORS[item.format] || ""}`}>{item.format}</Badge>}
                             {item.platform && <Badge variant="outline" className="text-[10px]">{item.platform}</Badge>}
                           </div>
-                          {item.description && <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>}
-                          {item.caption && <p className="text-xs text-muted-foreground line-clamp-2">Legenda: {item.caption}</p>}
+                          {item.description && <p className="text-xs text-muted-foreground line-clamp-2 break-words">{item.description}</p>}
+                          {item.caption && <p className="text-xs text-muted-foreground line-clamp-2 break-words">Legenda: {item.caption}</p>}
                         </div>
 
                         <div className="flex gap-1 shrink-0">
