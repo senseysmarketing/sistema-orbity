@@ -185,7 +185,7 @@ export function ContentPlanDetailsSheet({
   return (
     <>
       <Sheet open={open} onOpenChange={onClose}>
-        <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full">
+        <SheetContent className="w-full sm:max-w-2xl lg:max-w-3xl flex flex-col h-full">
           <SheetHeader className="shrink-0">
             <SheetTitle>{plan.clients?.name || "Cliente"} - {plan.title}</SheetTitle>
           </SheetHeader>
@@ -275,40 +275,41 @@ export function ContentPlanDetailsSheet({
               </div>
             )}
 
-            <ScrollArea className="flex-1 pr-2">
-              <div className="space-y-2">
+            <ScrollArea className="flex-1 pr-2 min-w-0">
+              <div className="space-y-2 min-w-0">
+
                 {filteredItems.map((item) => {
                   const isPending = item.status === "planned" && !item.task_id;
                   const statusInfo = STATUS_BADGES[item.status] || STATUS_BADGES.planned;
                   return (
-                    <div key={item.id} className={`p-3 rounded-md border bg-card overflow-hidden ${isPending && selectedItems.has(item.id) ? "border-primary/40 bg-primary/5" : ""}`}>
-                      <div className="flex items-start gap-2">
+                    <div key={item.id} className={`p-3 rounded-md border bg-card overflow-hidden w-full max-w-full ${isPending && selectedItems.has(item.id) ? "border-primary/40 bg-primary/5" : ""}`}>
+                      <div className="flex items-start gap-2 w-full min-w-0">
                         {isPending ? (
-                          <Checkbox checked={selectedItems.has(item.id)} onCheckedChange={() => toggleItem(item.id)} className="mt-0.5" />
+                          <Checkbox checked={selectedItems.has(item.id)} onCheckedChange={() => toggleItem(item.id)} className="mt-0.5 shrink-0" />
                         ) : (
                           <CheckCircle2 className={`h-4 w-4 mt-0.5 shrink-0 ${item.status === "discarded" ? "text-muted-foreground" : "text-green-500"}`} />
                         )}
 
                         <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <p className="text-sm font-medium truncate">{item.title}</p>
-                            <Badge className={`text-[10px] ${statusInfo.className}`}>{statusInfo.label}</Badge>
+                          <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                            <p className="text-sm font-medium truncate max-w-full min-w-0 flex-1">{item.title}</p>
+                            <Badge className={`text-[10px] shrink-0 ${statusInfo.className}`}>{statusInfo.label}</Badge>
                           </div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                             {item.post_date && (
-                              <Badge variant="outline" className="text-[10px] gap-0.5">
+                              <Badge variant="outline" className="text-[10px] gap-0.5 shrink-0">
                                 <Calendar className="h-2.5 w-2.5" />
                                 {new Date(item.post_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
                               </Badge>
                             )}
-                            {item.format && <Badge className={`text-[10px] ${FORMAT_COLORS[item.format] || ""}`}>{item.format}</Badge>}
-                            {item.platform && <Badge variant="outline" className="text-[10px]">{item.platform}</Badge>}
+                            {item.format && <Badge className={`text-[10px] shrink-0 ${FORMAT_COLORS[item.format] || ""}`}>{item.format}</Badge>}
+                            {item.platform && <Badge variant="outline" className="text-[10px] shrink-0">{item.platform}</Badge>}
                           </div>
-                          {item.description && <p className="text-xs text-muted-foreground line-clamp-2 break-words">{item.description}</p>}
-                          {item.caption && <p className="text-xs text-muted-foreground line-clamp-2 break-words">Legenda: {item.caption}</p>}
+                          {item.description && <p className="text-xs text-muted-foreground line-clamp-2 break-all">{item.description}</p>}
+                          {item.caption && <p className="text-xs text-muted-foreground line-clamp-2 break-all">Legenda: {item.caption}</p>}
                         </div>
 
-                        <div className="flex gap-1 shrink-0">
+                        <div className="flex gap-1 shrink-0 ml-auto">
                           {!item.task_id && (
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
                               <Pencil className="h-3.5 w-3.5" />
@@ -337,6 +338,7 @@ export function ContentPlanDetailsSheet({
                         </div>
                       </div>
                     </div>
+
                   );
                 })}
 
