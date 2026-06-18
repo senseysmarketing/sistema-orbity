@@ -521,7 +521,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                 <div>
                   <p className="text-sm font-medium mb-2">Responsáveis</p>
                   <TaskAssignedUsers
-                    users={assignedUsers.map(a => a.profiles)}
+                    users={assignedUsers.map((a: any) => a?.profiles ?? a)}
                     showNames
                   />
                 </div>
