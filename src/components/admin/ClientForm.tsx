@@ -125,6 +125,8 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
     if (client) {
       setFormData({
         name: client.name || '',
+        legal_name: client.legal_name || client.name || '',
+
         email: client.email || '',
         contact: client.contact || '',
         service: client.service || '',
