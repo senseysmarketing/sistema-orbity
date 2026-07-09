@@ -79,6 +79,7 @@ interface ClientFormProps {
 
 const initialFormData = {
   name: '',
+  legal_name: '',
   email: '',
   contact: '',
   service: '',
@@ -102,6 +103,7 @@ const initialFormData = {
   default_billing_type: 'manual',
   billing_automation_enabled: true,
 };
+
 
 export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCreated }: ClientFormProps) {
   const { toast } = useToast();
