@@ -10,6 +10,8 @@ interface ClientOverviewProps {
   client: {
     id: string;
     name: string;
+    legal_name?: string | null;
+
     contact?: string | null;
     service?: string | null;
     observations?: string | null;
