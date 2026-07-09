@@ -354,7 +354,7 @@ Deno.serve(async (req) => {
         const baseUrl = "https://api.asaas.com";
 
         const customerId = await ensureAsaasCustomer(
-          client,
+          clientForGateway,
           baseUrl,
           settings.asaas_api_key,
           adminClient,
@@ -416,7 +416,7 @@ Deno.serve(async (req) => {
 
         // Ensure customer exists in Conexa (uses unit_id as companyId)
         let conexaCustomerId = await ensureConexaCustomer(
-          client,
+          clientForGateway,
           conexaBaseUrl,
           settings.conexa_api_key,
           adminClient,
@@ -446,7 +446,7 @@ Deno.serve(async (req) => {
               .eq("id", client_id);
 
             conexaCustomerId = await ensureConexaCustomer(
-              { ...client, conexa_customer_id: null },
+              { ...clientForGateway, conexa_customer_id: null },
               conexaBaseUrl,
               settings.conexa_api_key,
               adminClient,
