@@ -153,8 +153,9 @@ Deno.serve(async (req) => {
           price_data: {
             currency,
             product_data: {
-              name: description?.trim() || `Cobrança — ${client.name}`,
-              description: `Cliente: ${client.name}`,
+              name: description?.trim() || `Cobrança — ${(client as any).legal_name || client.name}`,
+              description: `Cliente: ${(client as any).legal_name || client.name}`,
+
             },
             unit_amount: Math.round(Number(amount) * 100),
           },
