@@ -407,16 +407,34 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                 )}
               </div>
 
-              {/* Nome / Status */}
+              {/* Razão Social */}
+              <div className="grid gap-2">
+                <Label htmlFor="legal_name">Razão Social *</Label>
+                <Input
+                  id="legal_name"
+                  value={formData.legal_name}
+                  onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
+                  placeholder="Nome jurídico formal (usado nas notas fiscais e gateways)"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enviada aos gateways (Asaas, Conexa, Stripe) e usada na emissão de notas fiscais.
+                </p>
+              </div>
+
+              {/* Nome Fantasia / Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="name">Nome *</Label>
+                  <Label htmlFor="name">Nome Fantasia</Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
+                    placeholder="Como aparecerá no Orbity"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Opcional. Se vazio, usaremos a Razão Social.
+                  </p>
                 </div>
                 <div className="grid gap-2">
                   <Label>Status</Label>
@@ -430,6 +448,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                   </div>
                 </div>
               </div>
+
 
               {/* E-mail / Contato */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
