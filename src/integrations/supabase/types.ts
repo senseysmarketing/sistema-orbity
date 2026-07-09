@@ -2118,6 +2118,7 @@ export type Database = {
           has_loyalty: boolean
           health_score_rules: Json | null
           id: string
+          legal_name: string | null
           monthly_value: number | null
           name: string
           neighborhood: string | null
@@ -2157,6 +2158,7 @@ export type Database = {
           has_loyalty?: boolean
           health_score_rules?: Json | null
           id?: string
+          legal_name?: string | null
           monthly_value?: number | null
           name: string
           neighborhood?: string | null
@@ -2196,6 +2198,7 @@ export type Database = {
           has_loyalty?: boolean
           health_score_rules?: Json | null
           id?: string
+          legal_name?: string | null
           monthly_value?: number | null
           name?: string
           neighborhood?: string | null

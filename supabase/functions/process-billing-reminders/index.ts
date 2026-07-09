@@ -201,7 +201,7 @@ serve(async (req) => {
         // 5. Fetch pending payments for those due dates, with client info
         const { data: payments, error: payErr } = await supabase
           .from("client_payments")
-          .select("id, client_id, amount, due_date, billing_type, invoice_url, conexa_invoice_url, clients!inner(name, contact, billing_automation_enabled)")
+          .select("id, client_id, amount, due_date, billing_type, invoice_url, conexa_invoice_url, clients!inner(name, legal_name, contact, billing_automation_enabled)")
           .eq("agency_id", agencyId)
           .in("status", ["pending", "overdue"])
           .in("due_date", dueDates);
@@ -281,10 +281,13 @@ serve(async (req) => {
             // Format message
             const message = formatMessage(template, {
               nome_cliente: client.name ?? "",
+              nome_fantasia: client.name ?? "",
+              razao_social: client.legal_name ?? client.name ?? "",
               valor: formatBRL(payment.amount),
               data_vencimento: formatDateBR(payment.due_date),
               link_pagamento: paymentLink,
             });
+
 
             // Send via whatsapp-send (unified outbound)
             const sendRes = await fetch(

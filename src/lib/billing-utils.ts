@@ -15,11 +15,15 @@ export function renderBillingTemplate(
   // Create aliases to ensure compatibility with all possible tags
   const expandedVars = {
     ...vars,
-    nome: vars.nome || vars.nome_cliente,
+    nome: vars.nome || vars.nome_cliente || vars.nome_fantasia,
+    nome_cliente: vars.nome_cliente || vars.nome_fantasia || vars.nome,
+    nome_fantasia: vars.nome_fantasia || vars.nome_cliente || vars.nome,
+    razao_social: vars.razao_social || vars.nome_cliente || vars.nome,
     valor: vars.valor || vars.valor_formatado,
     vencimento: vars.vencimento || vars.data_vencimento,
     link: vars.link || vars.link_fatura || vars.link_pagamento,
   };
+
 
   // Sort keys by length descending to avoid partial matches
   const keys = Object.keys(expandedVars).sort((a, b) => b.length - a.length);

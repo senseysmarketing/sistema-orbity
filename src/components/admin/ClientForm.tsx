@@ -79,6 +79,7 @@ interface ClientFormProps {
 
 const initialFormData = {
   name: '',
+  legal_name: '',
   email: '',
   contact: '',
   service: '',
@@ -103,6 +104,7 @@ const initialFormData = {
   billing_automation_enabled: true,
 };
 
+
 export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCreated }: ClientFormProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
@@ -123,6 +125,8 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
     if (client) {
       setFormData({
         name: client.name || '',
+        legal_name: client.legal_name || client.name || '',
+
         email: client.email || '',
         contact: client.contact || '',
         service: client.service || '',
@@ -192,6 +196,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
       const cep = (data.cep || '').replace(/\D/g, '');
       setFormData(prev => ({
         ...prev,
+        legal_name: data.razao_social || prev.legal_name,
         name: data.nome_fantasia || data.razao_social || prev.name,
         email: data.email || prev.email,
         contact: data.ddd_telefone_1 ? formatPhone(data.ddd_telefone_1.replace(/\D/g, '')) : prev.contact,
@@ -203,6 +208,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
         city: data.municipio || prev.city,
         state: data.uf || prev.state,
       }));
+
       // Mark CEP as already fetched to prevent re-fetch on blur
       if (cep.length === 8) {
         setLastFetchedCep(cep);
@@ -248,6 +254,10 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
     if (!docDigits || (docDigits.length !== 11 && docDigits.length !== 14)) {
       missingFields.push("CPF/CNPJ válido");
     }
+    if (!formData.legal_name.trim() && !formData.name.trim()) {
+      missingFields.push("Razão Social");
+    }
+
     if (docDigits.length === 11 && !validateCPF(docDigits)) {
       toast({
         title: "CPF inválido",
@@ -291,9 +301,11 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
       const cleanZipCode = formData.zip_code.replace(/\D/g, '');
 
       const data = {
-        name: formData.name,
+        name: (formData.name.trim() || formData.legal_name.trim()),
+        legal_name: (formData.legal_name.trim() || formData.name.trim()) || null,
         email: formData.email || null,
         contact: formData.contact,
+
         service: formData.service,
         monthly_value: formData.monthly_value ? parseFloat(formData.monthly_value) : null,
         active: formData.active,
@@ -399,16 +411,34 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                 )}
               </div>
 
-              {/* Nome / Status */}
+              {/* Razão Social */}
+              <div className="grid gap-2">
+                <Label htmlFor="legal_name">Razão Social *</Label>
+                <Input
+                  id="legal_name"
+                  value={formData.legal_name}
+                  onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
+                  placeholder="Nome jurídico formal (usado nas notas fiscais e gateways)"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enviada aos gateways (Asaas, Conexa, Stripe) e usada na emissão de notas fiscais.
+                </p>
+              </div>
+
+              {/* Nome Fantasia / Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="name">Nome *</Label>
+                  <Label htmlFor="name">Nome Fantasia</Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
+                    placeholder="Como aparecerá no Orbity"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Opcional. Se vazio, usaremos a Razão Social.
+                  </p>
                 </div>
                 <div className="grid gap-2">
                   <Label>Status</Label>
@@ -422,6 +452,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                   </div>
                 </div>
               </div>
+
 
               {/* E-mail / Contato */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

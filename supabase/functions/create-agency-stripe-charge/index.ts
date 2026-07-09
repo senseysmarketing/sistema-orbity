@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
     const { data: client } = await admin
       .from("clients")
-      .select("id, name, email")
+      .select("id, name, legal_name, email")
       .eq("id", client_id)
       .eq("agency_id", agency_id)
       .maybeSingle();
@@ -153,8 +153,9 @@ Deno.serve(async (req) => {
           price_data: {
             currency,
             product_data: {
-              name: description?.trim() || `Cobrança — ${client.name}`,
-              description: `Cliente: ${client.name}`,
+              name: description?.trim() || `Cobrança — ${(client as any).legal_name || client.name}`,
+              description: `Cliente: ${(client as any).legal_name || client.name}`,
+
             },
             unit_amount: Math.round(Number(amount) * 100),
           },

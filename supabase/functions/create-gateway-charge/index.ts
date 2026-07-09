@@ -300,13 +300,18 @@ Deno.serve(async (req) => {
     // 3. Fetch client data (user-scoped for RLS)
     const { data: client, error: clientError } = await userClient
       .from("clients")
-      .select("id, name, email, document, contact, asaas_customer_id, conexa_customer_id, zip_code, street, number, neighborhood, city, state, complement")
+      .select("id, name, legal_name, email, document, contact, asaas_customer_id, conexa_customer_id, zip_code, street, number, neighborhood, city, state, complement")
       .eq("id", client_id)
       .single();
 
     if (clientError || !client) {
       return jsonResponse({ error: "Client not found or access denied" }, 404);
     }
+
+    // Use Razão Social (legal_name) for formal gateway/invoice records; fallback to display name.
+    const formalClientName = ((client as any).legal_name?.trim?.() || client.name) as string;
+    const clientForGateway = { ...client, name: formalClientName };
+
 
     // Variables to populate from gateway responses
     let asaas_payment_id: string | null = null;
@@ -349,7 +354,7 @@ Deno.serve(async (req) => {
         const baseUrl = "https://api.asaas.com";
 
         const customerId = await ensureAsaasCustomer(
-          client,
+          clientForGateway,
           baseUrl,
           settings.asaas_api_key,
           adminClient,
@@ -411,7 +416,7 @@ Deno.serve(async (req) => {
 
         // Ensure customer exists in Conexa (uses unit_id as companyId)
         let conexaCustomerId = await ensureConexaCustomer(
-          client,
+          clientForGateway,
           conexaBaseUrl,
           settings.conexa_api_key,
           adminClient,
@@ -441,7 +446,7 @@ Deno.serve(async (req) => {
               .eq("id", client_id);
 
             conexaCustomerId = await ensureConexaCustomer(
-              { ...client, conexa_customer_id: null },
+              { ...clientForGateway, conexa_customer_id: null },
               conexaBaseUrl,
               settings.conexa_api_key,
               adminClient,
