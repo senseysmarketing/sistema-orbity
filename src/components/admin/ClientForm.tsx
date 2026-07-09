@@ -254,6 +254,10 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
     if (!docDigits || (docDigits.length !== 11 && docDigits.length !== 14)) {
       missingFields.push("CPF/CNPJ válido");
     }
+    if (!formData.legal_name.trim() && !formData.name.trim()) {
+      missingFields.push("Razão Social");
+    }
+
     if (docDigits.length === 11 && !validateCPF(docDigits)) {
       toast({
         title: "CPF inválido",
