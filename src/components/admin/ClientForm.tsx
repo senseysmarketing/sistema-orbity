@@ -196,6 +196,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
       const cep = (data.cep || '').replace(/\D/g, '');
       setFormData(prev => ({
         ...prev,
+        legal_name: data.razao_social || prev.legal_name,
         name: data.nome_fantasia || data.razao_social || prev.name,
         email: data.email || prev.email,
         contact: data.ddd_telefone_1 ? formatPhone(data.ddd_telefone_1.replace(/\D/g, '')) : prev.contact,
@@ -207,6 +208,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
         city: data.municipio || prev.city,
         state: data.uf || prev.state,
       }));
+
       // Mark CEP as already fetched to prevent re-fetch on blur
       if (cep.length === 8) {
         setLastFetchedCep(cep);
