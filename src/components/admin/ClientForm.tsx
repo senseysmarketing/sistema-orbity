@@ -297,9 +297,11 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
       const cleanZipCode = formData.zip_code.replace(/\D/g, '');
 
       const data = {
-        name: formData.name,
+        name: (formData.name.trim() || formData.legal_name.trim()),
+        legal_name: (formData.legal_name.trim() || formData.name.trim()) || null,
         email: formData.email || null,
         contact: formData.contact,
+
         service: formData.service,
         monthly_value: formData.monthly_value ? parseFloat(formData.monthly_value) : null,
         active: formData.active,
