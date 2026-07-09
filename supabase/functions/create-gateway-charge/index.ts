@@ -300,7 +300,7 @@ Deno.serve(async (req) => {
     // 3. Fetch client data (user-scoped for RLS)
     const { data: client, error: clientError } = await userClient
       .from("clients")
-      .select("id, name, email, document, contact, asaas_customer_id, conexa_customer_id, zip_code, street, number, neighborhood, city, state, complement")
+      .select("id, name, legal_name, email, document, contact, asaas_customer_id, conexa_customer_id, zip_code, street, number, neighborhood, city, state, complement")
       .eq("id", client_id)
       .single();
 
