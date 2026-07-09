@@ -281,10 +281,13 @@ serve(async (req) => {
             // Format message
             const message = formatMessage(template, {
               nome_cliente: client.name ?? "",
+              nome_fantasia: client.name ?? "",
+              razao_social: client.legal_name ?? client.name ?? "",
               valor: formatBRL(payment.amount),
               data_vencimento: formatDateBR(payment.due_date),
               link_pagamento: paymentLink,
             });
+
 
             // Send via whatsapp-send (unified outbound)
             const sendRes = await fetch(
