@@ -308,6 +308,11 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Client not found or access denied" }, 404);
     }
 
+    // Use Razão Social (legal_name) for formal gateway/invoice records; fallback to display name.
+    const formalClientName = ((client as any).legal_name?.trim?.() || client.name) as string;
+    const clientForGateway = { ...client, name: formalClientName };
+
+
     // Variables to populate from gateway responses
     let asaas_payment_id: string | null = null;
     let invoice_url: string | null = null;
