@@ -63,7 +63,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       // Emulado com dois .order() — o último_aggregated_at vence quando não-nulo.
       const { data, error } = await supabase
         .from('notifications')
-        .select('*')
+        .select('id,user_id,agency_id,type,priority,title,message,action_url,action_label,metadata,is_read,is_archived,scheduled_for,created_at,read_at,entity_type,entity_id,action_type,group_count,last_aggregated_at')
         .eq('agency_id', currentAgency.id)
         .eq('is_archived', false)
         .order('last_aggregated_at', { ascending: false, nullsFirst: false })
