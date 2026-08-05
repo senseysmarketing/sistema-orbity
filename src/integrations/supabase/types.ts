@@ -8325,8 +8325,14 @@ export type Database = {
         Args: { p_agency_id: string; p_type: string; p_user_id: string }
         Returns: boolean
       }
+      cleanup_automation_retention: { Args: never; Returns: number }
       cleanup_conexa_webhook_log: { Args: never; Returns: undefined }
+      cleanup_daily_all: { Args: never; Returns: undefined }
+      cleanup_facebook_audit_retention: { Args: never; Returns: number }
+      cleanup_notifications_retention: { Args: never; Returns: number }
       cleanup_old_notification_tracking: { Args: never; Returns: undefined }
+      cleanup_retention: { Args: never; Returns: undefined }
+      cleanup_whatsapp_retention: { Args: never; Returns: number }
       complete_fast_track: { Args: { agency_uuid: string }; Returns: boolean }
       delete_agency_cascade: {
         Args: { p_agency_id: string }
