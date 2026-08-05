@@ -82,7 +82,7 @@ export function useCampaigns() {
     try {
       const { error } = await supabase
         .from('campaigns')
-        .update(updates)
+        .update(updates as any)
         .eq('id', id);
 
       if (error) throw error;

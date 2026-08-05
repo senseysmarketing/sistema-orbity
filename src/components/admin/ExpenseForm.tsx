@@ -197,7 +197,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
         // Atualizar despesa existente
         const { error } = await supabase
           .from('expenses')
-          .update(baseData)
+          .update(baseData as any)
           .eq('id', expense.id);
         if (error) throw error;
 

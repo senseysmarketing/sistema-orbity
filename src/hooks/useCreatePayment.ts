@@ -95,7 +95,7 @@ export function useCreatePayment() {
       const { id, ...payload } = data;
       const { error } = await supabase
         .from("client_payments")
-        .update({ ...payload, agency_id: currentAgency?.id })
+        .update({ ...payload, agency_id: currentAgency?.id } as any)
         .eq("id", id);
 
       if (error) throw error;

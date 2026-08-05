@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendText } from "../_shared/uazapi.ts";
-import { normalizePhone, previewOf } from "../_shared/whatsapp.ts";
+import { normalizePhone, previewOf, phoneVariants } from "../_shared/whatsapp.ts";
 import { resolveLeadConversation } from "../_shared/whatsapp-conversation.ts";
 
 const corsHeaders = {
@@ -99,24 +99,54 @@ serve(async (req) => {
       }, 403);
     }
 
-    // 3) Send via provider
+    // 3) Send via provider (with 9th-digit fallback for BR numbers)
     const normalized = normalizePhone(phone_number);
     if (!normalized || normalized.length < 10) {
       return json({ success: false, code: 'invalid_phone', error: 'Invalid phone number' }, 400);
     }
 
-    const sendRes = await sendText(account, { number: normalized, text: message });
+    // Candidatos: número normalizado primeiro, depois variantes com DDI 55 (com/sem 9º dígito)
+    const candidates = Array.from(new Set([
+      normalized,
+      ...phoneVariants(normalized).filter((v) => v.startsWith('55') && (v.length === 12 || v.length === 13)),
+    ]));
+
+    let sendRes = await sendText(account, { number: candidates[0], text: message });
+    let usedNumber = candidates[0];
+
+    if (!sendRes.ok) {
+      for (const candidate of candidates.slice(1)) {
+        console.log('[whatsapp-send] Retrying with phone variant', { candidate });
+        const retry = await sendText(account, { number: candidate, text: message });
+        if (retry.ok) {
+          sendRes = retry;
+          usedNumber = candidate;
+          break;
+        }
+      }
+    }
 
     if (!sendRes.ok) {
       console.error('[whatsapp-send] Provider error', {
-        account_id: account.id, status: sendRes.status, error: sendRes.error,
+        account_id: account.id, status: sendRes.status, error: sendRes.error, tried: candidates,
       });
       return json({
         success: false, code: 'provider_failed',
         error: sendRes.error || 'Provider send failed',
         provider: { status: sendRes.status },
+        tried: candidates,
       }, 502);
     }
+
+    // Se a variante que funcionou for diferente da cadastrada, corrige o cadastro do cliente
+    if (usedNumber !== normalized && client_id) {
+      try {
+        await supabase.from('clients').update({ contact: usedNumber }).eq('id', client_id);
+      } catch (e) {
+        console.warn('[whatsapp-send] Failed to persist corrected phone', e);
+      }
+    }
+
 
     // 4) Resolve / create conversation
     const conv = await resolveLeadConversation(supabase, {
