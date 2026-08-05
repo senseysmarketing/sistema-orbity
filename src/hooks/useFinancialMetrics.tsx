@@ -595,7 +595,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
 
       const { error } = await supabase
         .from(table)
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id);
 
       if (error) throw error;

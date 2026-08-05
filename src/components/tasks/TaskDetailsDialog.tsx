@@ -1044,7 +1044,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
 
                   const { error } = await supabase
                     .from("tasks")
-                    .update(updates)
+                    .update(updates as any)
                     .eq("id", localTask.id);
 
                   if (error) throw error;

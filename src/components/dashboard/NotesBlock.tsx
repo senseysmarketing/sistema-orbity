@@ -83,7 +83,7 @@ export function NotesBlock() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       setSaving(true);
-      await supabase.from('notes').update({ [field]: value }).eq('id', selectedId);
+      await supabase.from('notes').update({ [field]: value } as any).eq('id', selectedId);
       setSaving(false);
     }, 800);
   }, [selectedId]);
