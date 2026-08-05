@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendText } from "../_shared/uazapi.ts";
-import { normalizePhone, previewOf } from "../_shared/whatsapp.ts";
+import { normalizePhone, previewOf, phoneVariants } from "../_shared/whatsapp.ts";
 import { resolveLeadConversation } from "../_shared/whatsapp-conversation.ts";
 
 const corsHeaders = {
