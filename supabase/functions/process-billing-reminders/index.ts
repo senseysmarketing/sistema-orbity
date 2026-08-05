@@ -339,13 +339,18 @@ serve(async (req) => {
                 console.error(`[billing-reminders] Failed to write error log:`, logErr);
               }
             } else {
-              // Insert dedup tracking
+              // Insert dedup tracking (agency_id é NOT NULL — sem ele o insert falha e duplica envios)
               const systemUserId = "00000000-0000-0000-0000-000000000000";
-              await supabase.from("notification_tracking").insert({
+              const { error: trackErr } = await supabase.from("notification_tracking").insert({
                 user_id: systemUserId,
+                agency_id: agencyId,
                 entity_id: payment.id,
                 notification_type: dedupType,
               });
+              if (trackErr) {
+                console.error(`[billing-reminders] Dedup tracking insert failed for ${payment.id}:`, trackErr);
+              }
+
 
               totalSent++;
               console.log(
