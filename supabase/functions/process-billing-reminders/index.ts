@@ -64,14 +64,14 @@ function formatMessage(
   return out;
 }
 
-type Gateway = "manual" | "conexa" | "asaas";
+type Gateway = "manual" | "conexa" | "asaas" | "stripe";
 
 function resolveGateway(
   paymentBillingType: string | null,
   activeGateway: string
 ): Gateway {
   const bt = paymentBillingType ?? activeGateway ?? "manual";
-  if (["manual", "conexa", "asaas"].includes(bt)) return bt as Gateway;
+  if (["manual", "conexa", "asaas", "stripe"].includes(bt)) return bt as Gateway;
   return "manual";
 }
 
@@ -164,7 +164,8 @@ serve(async (req) => {
         const manualOn = settings.manual_billing_enabled === true;
         const conexaOn = settings.conexa_billing_enabled === true;
         const asaasOn = settings.asaas_billing_enabled === true;
-        if (!manualOn && !conexaOn && !asaasOn) {
+        const stripeOn = settings.stripe_billing_enabled === true;
+        if (!manualOn && !conexaOn && !asaasOn && !stripeOn) {
           console.log(`[billing-reminders] Agency ${agencyId}: all gateway billings disabled, skipping`);
           continue;
         }
@@ -241,7 +242,7 @@ serve(async (req) => {
             // Resolve gateway and check toggle
             const gw = resolveGateway(payment.billing_type, settings.active_gateway);
             const gwEnabled =
-              gw === "manual" ? manualOn : gw === "conexa" ? conexaOn : asaasOn;
+              gw === "manual" ? manualOn : gw === "conexa" ? conexaOn : gw === "asaas" ? asaasOn : stripeOn;
             if (!gwEnabled) {
               totalSkipped++;
               continue;

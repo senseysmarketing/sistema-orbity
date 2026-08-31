@@ -37,6 +37,8 @@ const statusConfig: Record<string, { label: string; variant: "default" | "warnin
   cancelled: { label: "Cancelado", variant: "secondary" },
 };
 
+const validBillingTypes = ["manual", "asaas", "conexa", "stripe"];
+
 export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselectedClient, clients = [] }: PaymentSheetProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency(); // kept for cancel/contract flows
@@ -88,7 +90,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
       setStatus(payment.status || "pending");
       setDescription(payment.description || "");
       const paymentBt = payment.billing_type || client?.default_billing_type || 'manual';
-      setBillingType(enabledGateways.includes(paymentBt) ? paymentBt : 'manual');
+      setBillingType(validBillingTypes.includes(paymentBt) ? paymentBt : 'manual');
     } else if (preselectedClient) {
       const now = new Date();
       const defaultDue = new Date(now.getFullYear(), now.getMonth(), 15);
@@ -258,7 +260,49 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const hasAsaasCharge = !!payment?.asaas_payment_id;
   const hasConexaCharge = !!payment?.conexa_charge_id;
   const isGatewayActive = billingType !== 'manual';
-  const gatewayName = billingType === 'asaas' ? 'Asaas' : billingType === 'conexa' ? 'Conexa' : 'Manual';
+  const gatewayName = billingType === 'asaas' ? 'Asaas' : billingType === 'conexa' ? 'Conexa' : billingType === 'stripe' ? 'Stripe' : 'Manual';
+  const isMonthlyContractPayment = payment?.source === 'monthly_contract' || !!payment?.billing_cycle_month;
+  const generationStatus = payment?.generation_status as string | undefined;
+  const generationStatusConfig: Record<string, { label: string; variant: "default" | "warning" | "success" | "danger" | "secondary"; description: string }> = {
+    pending: {
+      label: "Na fila",
+      variant: "warning",
+      description: `A cobrança externa via ${gatewayName} sera gerada automaticamente pelo worker.`,
+    },
+    processing: {
+      label: "Gerando",
+      variant: "warning",
+      description: `O worker esta criando a cobranca no ${gatewayName}.`,
+    },
+    retrying: {
+      label: "Tentando novamente",
+      variant: "warning",
+      description: "A ultima tentativa falhou e uma nova tentativa foi agendada.",
+    },
+    generated: {
+      label: "Gerada",
+      variant: "success",
+      description: `A cobranca externa via ${gatewayName} foi gerada com sucesso.`,
+    },
+    failed: {
+      label: "Falhou",
+      variant: "danger",
+      description: "A geracao automatica falhou e precisa de ajuste manual ou nova tentativa.",
+    },
+    skipped: {
+      label: "Sem fila",
+      variant: "secondary",
+      description: "Esta fatura nao exige geracao automatica em gateway.",
+    },
+  };
+  const currentGenerationStatus = generationStatus ? generationStatusConfig[generationStatus] : null;
+  const billingTypeOptions = useMemo(() => {
+    const options = [...enabledGateways];
+    if (validBillingTypes.includes(billingType) && !options.includes(billingType)) {
+      options.push(billingType);
+    }
+    return options;
+  }, [billingType, enabledGateways]);
 
   const handleGenerateAsaasCharge = async () => {
     if (!payment || !currentAgency?.id) return;
@@ -368,6 +412,22 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                   </AlertDescription>
                 </Alert>
               )}
+              {isEditing && isMonthlyContractPayment && currentGenerationStatus && generationStatus !== "skipped" && (
+                <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                  <AlertTriangle className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="space-y-2 text-blue-700 dark:text-blue-300 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{currentGenerationStatus.description}</span>
+                      <Badge variant={currentGenerationStatus.variant} className="shrink-0 text-[10px]">
+                        {currentGenerationStatus.label}
+                      </Badge>
+                    </div>
+                    {payment?.generation_last_error && (
+                      <p className="text-[11px] text-destructive">{payment.generation_last_error}</p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
               {/* Cliente */}
               <div className="space-y-2">
                 <Label>Cliente *</Label>
@@ -445,7 +505,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                 <Select value={billingType} onValueChange={setBillingType}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {enabledGateways.map((gw) => (
+                    {billingTypeOptions.map((gw) => (
                       <SelectItem key={gw} value={gw}>
                         {gw === 'manual' ? 'Manual' : gw === 'asaas' ? 'Asaas' : gw === 'stripe' ? 'Stripe' : 'Conexa'}
                       </SelectItem>

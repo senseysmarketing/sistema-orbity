@@ -16,7 +16,8 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SUPABASE_SERVICE_ROLE_KEY =
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -28,11 +29,16 @@ function jsonResponse(body: unknown, status = 200) {
 // --------------- Asaas helpers ---------------
 
 async function ensureAsaasCustomer(
-  client: { name: string; email: string | null; document: string | null; asaas_customer_id: string | null },
+  client: {
+    name: string;
+    email: string | null;
+    document: string | null;
+    asaas_customer_id: string | null;
+  },
   baseUrl: string,
   apiKey: string,
   adminClient: any,
-  clientId: string
+  clientId: string,
 ): Promise<string> {
   if (client.asaas_customer_id) return client.asaas_customer_id;
 
@@ -40,7 +46,7 @@ async function ensureAsaasCustomer(
   if (client.email) payload.email = client.email;
   if (client.document) payload.cpfCnpj = client.document;
 
-  const res = await fetch(`${baseUrl}/v3/customers`, {
+  const res = await fetch(`${baseUrl}/customers`, {
     method: "POST",
     headers: { "Content-Type": "application/json", access_token: apiKey },
     body: JSON.stringify(payload),
@@ -69,7 +75,7 @@ async function createAsaasPayment(
   description: string | null,
   settings: Record<string, unknown>,
   baseUrl: string,
-  apiKey: string
+  apiKey: string,
 ) {
   const body: Record<string, unknown> = {
     customer: customerId,
@@ -94,7 +100,7 @@ async function createAsaasPayment(
     };
   }
 
-  const res = await fetch(`${baseUrl}/v3/payments`, {
+  const res = await fetch(`${baseUrl}/payments`, {
     method: "POST",
     headers: { "Content-Type": "application/json", access_token: apiKey },
     body: JSON.stringify(body),
@@ -129,21 +135,23 @@ async function ensureConexaCustomer(
   apiKey: string,
   adminClient: any,
   clientId: string,
-  unitId: number
+  unitId: number,
 ): Promise<string> {
   if (client.conexa_customer_id) return client.conexa_customer_id;
 
   if (!Number.isInteger(unitId) || unitId <= 0) {
-    throw new Error("ID da Unidade do Conexa não configurado para esta agência.");
+    throw new Error(
+      "ID da Unidade do Conexa não configurado para esta agência.",
+    );
   }
 
   // 1. Clean and identify document (CPF vs CNPJ)
-  const cleanDocument = client.document?.replace(/\D/g, '') || '';
+  const cleanDocument = client.document?.replace(/\D/g, "") || "";
   const isCnpj = cleanDocument.length > 11;
 
   // 2. Clean phone — API requires 10-11 digits, strip DDI 55
-  let cleanPhone = client.contact?.replace(/\D/g, '') || '';
-  if (cleanPhone.startsWith('55') && cleanPhone.length > 11) {
+  let cleanPhone = client.contact?.replace(/\D/g, "") || "";
+  if (cleanPhone.startsWith("55") && cleanPhone.length > 11) {
     cleanPhone = cleanPhone.substring(2);
   }
   if (cleanPhone.length > 11) {
@@ -151,17 +159,19 @@ async function ensureConexaCustomer(
   }
 
   // 3. Address payload (only if zip_code exists)
-  const addressPayload = client.zip_code ? {
-    address: {
-      zipCode: client.zip_code.replace(/\D/g, ''),
-      street: client.street || '',
-      number: client.number || 'S/N',
-      neighborhood: client.neighborhood || '',
-      city: client.city || '',
-      state: client.state || '',
-      additionalDetails: client.complement || '',
-    },
-  } : {};
+  const addressPayload = client.zip_code
+    ? {
+        address: {
+          zipCode: client.zip_code.replace(/\D/g, ""),
+          street: client.street || "",
+          number: client.number || "S/N",
+          neighborhood: client.neighborhood || "",
+          city: client.city || "",
+          state: client.state || "",
+          additionalDetails: client.complement || "",
+        },
+      }
+    : {};
 
   // 4. Build final body per Conexa API v2 spec
   const customerBody: Record<string, unknown> = {
@@ -178,7 +188,10 @@ async function ensureConexaCustomer(
         : {}),
   };
 
-  console.log("[Conexa] Creating customer with body:", JSON.stringify(customerBody));
+  console.log(
+    "[Conexa] Creating customer with body:",
+    JSON.stringify(customerBody),
+  );
 
   const res = await fetch(`${baseUrl}/customer`, {
     method: "POST",
@@ -191,7 +204,9 @@ async function ensureConexaCustomer(
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Conexa customer creation failed (${res.status}): ${errText}`);
+    throw new Error(
+      `Conexa customer creation failed (${res.status}): ${errText}`,
+    );
   }
 
   const data = await res.json();
@@ -212,14 +227,14 @@ async function createConexaSale(
   _description: string | null,
   productId: number,
   baseUrl: string,
-  apiKey: string
+  apiKey: string,
 ) {
   const body: Record<string, unknown> = {
     customerId: parseInt(customerId, 10),
     productId,
     quantity: 1,
     amount,
-    referenceDate: new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00'),
+    referenceDate: new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00"),
   };
 
   if (_description) {
@@ -239,8 +254,13 @@ async function createConexaSale(
 
   if (!res.ok) {
     const err = await res.text();
-    if (err.includes("product") && (err.includes("company") || err.includes("unit"))) {
-      throw new Error(`O produto configurado não pertence à mesma unidade do cliente no Conexa. Verifique se o ID do Produto Padrão está cadastrado na unidade correta. Erro original: ${err}`);
+    if (
+      err.includes("product") &&
+      (err.includes("company") || err.includes("unit"))
+    ) {
+      throw new Error(
+        `O produto configurado não pertence à mesma unidade do cliente no Conexa. Verifique se o ID do Produto Padrão está cadastrado na unidade correta. Erro original: ${err}`,
+      );
     }
     throw new Error(`Conexa sale creation failed (${res.status}): ${err}`);
   }
@@ -267,7 +287,8 @@ Deno.serve(async (req) => {
     });
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    const { data: claimsData, error: claimsError } =
+      await userClient.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
@@ -290,8 +311,11 @@ Deno.serve(async (req) => {
 
     if (!client_id || !amount || !due_date || !agency_id) {
       return jsonResponse(
-        { error: "Missing required fields: client_id, amount, due_date, agency_id" },
-        400
+        {
+          error:
+            "Missing required fields: client_id, amount, due_date, agency_id",
+        },
+        400,
       );
     }
 
@@ -300,7 +324,9 @@ Deno.serve(async (req) => {
     // 3. Fetch client data (user-scoped for RLS)
     const { data: client, error: clientError } = await userClient
       .from("clients")
-      .select("id, name, legal_name, email, document, contact, asaas_customer_id, conexa_customer_id, zip_code, street, number, neighborhood, city, state, complement")
+      .select(
+        "id, name, legal_name, email, document, contact, asaas_customer_id, conexa_customer_id, zip_code, street, number, neighborhood, city, state, complement",
+      )
       .eq("id", client_id)
       .single();
 
@@ -309,27 +335,73 @@ Deno.serve(async (req) => {
     }
 
     // Use Razão Social (legal_name) for formal gateway/invoice records; fallback to display name.
-    const formalClientName = ((client as any).legal_name?.trim?.() || client.name) as string;
+    const formalClientName = ((client as any).legal_name?.trim?.() ||
+      client.name) as string;
     const clientForGateway = { ...client, name: formalClientName };
 
+    const effectiveBillingType = billing_type || "manual";
+
+    let existingPayment: any = null;
+    if (payment_id) {
+      const { data, error: existingPaymentError } = await adminClient
+        .from("client_payments")
+        .select(
+          `
+          asaas_payment_id,
+          invoice_url,
+          pix_copy_paste,
+          conexa_sale_id,
+          conexa_charge_id,
+          conexa_invoice_url,
+          conexa_charge_url,
+          conexa_billet_url,
+          conexa_pix_copy_paste,
+          conexa_pix_qr_code,
+          conexa_raw_charge,
+          conexa_billing_status,
+          conexa_last_sync_at
+        `,
+        )
+        .eq("id", payment_id)
+        .eq("agency_id", agency_id)
+        .maybeSingle();
+
+      if (existingPaymentError) {
+        return jsonResponse(
+          {
+            error: "Failed to inspect existing payment",
+            details: existingPaymentError.message,
+          },
+          500,
+        );
+      }
+      existingPayment = data;
+    }
 
     // Variables to populate from gateway responses
-    let asaas_payment_id: string | null = null;
-    let invoice_url: string | null = null;
-    let pix_copy_paste: string | null = null;
-    let conexa_sale_id: string | null = null;
-    let conexa_charge_id: string | null = null;
-    let conexa_invoice_url: string | null = null;
-    let conexa_charge_url: string | null = null;
-    let conexa_billet_url: string | null = null;
-    let conexa_pix_copy_paste: string | null = null;
-    let conexa_pix_qr_code: string | null = null;
-    let conexa_raw_charge: unknown = null;
-    let conexa_billing_status: string | null = null;
-    let conexa_last_sync_at: string | null = null;
+    let asaas_payment_id: string | null =
+      existingPayment?.asaas_payment_id ?? null;
+    let invoice_url: string | null = existingPayment?.invoice_url ?? null;
+    let pix_copy_paste: string | null = existingPayment?.pix_copy_paste ?? null;
+    let conexa_sale_id: string | null = existingPayment?.conexa_sale_id ?? null;
+    let conexa_charge_id: string | null =
+      existingPayment?.conexa_charge_id ?? null;
+    let conexa_invoice_url: string | null =
+      existingPayment?.conexa_invoice_url ?? null;
+    let conexa_charge_url: string | null =
+      existingPayment?.conexa_charge_url ?? null;
+    let conexa_billet_url: string | null =
+      existingPayment?.conexa_billet_url ?? null;
+    let conexa_pix_copy_paste: string | null =
+      existingPayment?.conexa_pix_copy_paste ?? null;
+    let conexa_pix_qr_code: string | null =
+      existingPayment?.conexa_pix_qr_code ?? null;
+    let conexa_raw_charge: unknown = existingPayment?.conexa_raw_charge ?? null;
+    let conexa_billing_status: string | null =
+      existingPayment?.conexa_billing_status ?? null;
+    let conexa_last_sync_at: string | null =
+      existingPayment?.conexa_last_sync_at ?? null;
     let gateway_fee: number | null = null;
-
-    const effectiveBillingType = billing_type || "manual";
 
     // 4. Gateway routing
     if (effectiveBillingType === "asaas" || effectiveBillingType === "conexa") {
@@ -342,64 +414,103 @@ Deno.serve(async (req) => {
       if (settingsError || !settings) {
         return jsonResponse(
           { error: "Payment settings not found for this agency" },
-          422
+          422,
         );
       }
 
       if (effectiveBillingType === "asaas") {
-        if (!settings.asaas_api_key) {
-          return jsonResponse({ error: "Asaas API key not configured" }, 422);
+        if (asaas_payment_id) {
+          console.log(
+            `[Gateway] Reusing existing Asaas payment ${asaas_payment_id}`,
+          );
+        } else {
+          if (!settings.asaas_api_key) {
+            return jsonResponse({ error: "Asaas API key not configured" }, 422);
+          }
+
+          const baseUrl =
+            settings.asaas_sandbox === true
+              ? "https://api-sandbox.asaas.com/v3"
+              : "https://api.asaas.com/v3";
+
+          const customerId = await ensureAsaasCustomer(
+            clientForGateway,
+            baseUrl,
+            settings.asaas_api_key,
+            adminClient,
+            client_id,
+          );
+
+          const asaasResponse = await createAsaasPayment(
+            customerId,
+            amount,
+            due_date,
+            description,
+            settings,
+            baseUrl,
+            settings.asaas_api_key,
+          );
+
+          asaas_payment_id = asaasResponse.id || null;
+          invoice_url = asaasResponse.invoiceUrl || null;
+          pix_copy_paste = asaasResponse.pixCopiaECola || null;
         }
-
-        const baseUrl = "https://api.asaas.com";
-
-        const customerId = await ensureAsaasCustomer(
-          clientForGateway,
-          baseUrl,
-          settings.asaas_api_key,
-          adminClient,
-          client_id
-        );
-
-        const asaasResponse = await createAsaasPayment(
-          customerId,
-          amount,
-          due_date,
-          description,
-          settings,
-          baseUrl,
-          settings.asaas_api_key
-        );
-
-        asaas_payment_id = asaasResponse.id || null;
-        invoice_url = asaasResponse.invoiceUrl || null;
-        pix_copy_paste = asaasResponse.pixCopiaECola || null;
-
       } else if (effectiveBillingType === "conexa") {
         // Validate all required Conexa settings
         if (!settings.conexa_api_key) {
-          return jsonResponse({ error: "Token de acesso do Conexa não configurado. Vá em Configurações > Integrações." }, 422);
+          return jsonResponse(
+            {
+              error:
+                "Token de acesso do Conexa não configurado. Vá em Configurações > Integrações.",
+            },
+            422,
+          );
         }
         if (!settings.conexa_subdomain) {
-          return jsonResponse({ error: "Subdomínio do Conexa não configurado. Vá em Configurações > Integrações." }, 422);
+          return jsonResponse(
+            {
+              error:
+                "Subdomínio do Conexa não configurado. Vá em Configurações > Integrações.",
+            },
+            422,
+          );
         }
         if (!settings.conexa_default_product_id) {
-          return jsonResponse({ error: "ID do Produto Padrão do Conexa não configurado. Vá em Configurações > Integrações." }, 422);
+          return jsonResponse(
+            {
+              error:
+                "ID do Produto Padrão do Conexa não configurado. Vá em Configurações > Integrações.",
+            },
+            422,
+          );
         }
         if (!settings.conexa_unit_id) {
-          return jsonResponse({ error: "ID da Unidade do Conexa não configurado. Vá em Configurações > Integrações e preencha o campo 'ID da Unidade'." }, 422);
+          return jsonResponse(
+            {
+              error:
+                "ID da Unidade do Conexa não configurado. Vá em Configurações > Integrações e preencha o campo 'ID da Unidade'.",
+            },
+            422,
+          );
         }
 
         // Se auto-boleto está ativo, validar meio de faturamento ANTES de criar venda
         const autoBillet = settings.conexa_auto_generate_billet === true;
         if (autoBillet && !settings.conexa_invoicing_method_id) {
-          return jsonResponse({
-            error: "Auto-geração de boleto está ativa, mas nenhum Meio de Faturamento foi selecionado. Vá em Configurações > Integrações > Conexa e clique em 'Buscar meios de faturamento'.",
-          }, 422);
+          return jsonResponse(
+            {
+              error:
+                "Auto-geração de boleto está ativa, mas nenhum Meio de Faturamento foi selecionado. Vá em Configurações > Integrações > Conexa e clique em 'Buscar meios de faturamento'.",
+            },
+            422,
+          );
         }
 
         const conexaBaseUrl = `https://${settings.conexa_subdomain}.conexa.app/index.php/api/v2`;
-        const conexaCreds: ConexaCreds = { baseUrl: conexaBaseUrl, apiKey: settings.conexa_api_key };
+        const conexaCreds: ConexaCreds = {
+          baseUrl: conexaBaseUrl,
+          apiKey: settings.conexa_api_key,
+        };
 
         if (autoBillet) {
           try {
@@ -414,46 +525,22 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Ensure customer exists in Conexa (uses unit_id as companyId)
-        let conexaCustomerId = await ensureConexaCustomer(
-          clientForGateway,
-          conexaBaseUrl,
-          settings.conexa_api_key,
-          adminClient,
-          client_id,
-          settings.conexa_unit_id
-        );
+        let saleId = conexa_sale_id;
 
-        // Create sale in Conexa (flat payload, no companyId)
-        let conexaResponse;
-        try {
-          conexaResponse = await createConexaSale(
-            conexaCustomerId,
-            amount,
-            due_date,
-            description,
-            settings.conexa_default_product_id,
+        if (!saleId) {
+          // Ensure customer exists in Conexa (uses unit_id as companyId)
+          let conexaCustomerId = await ensureConexaCustomer(
+            clientForGateway,
             conexaBaseUrl,
-            settings.conexa_api_key
+            settings.conexa_api_key,
+            adminClient,
+            client_id,
+            settings.conexa_unit_id,
           );
-        } catch (saleError: any) {
-          // If customer doesn't exist in Conexa anymore, clear stale ID and retry
-          if (saleError.message?.includes("Customer does not exist")) {
-            console.warn("[Conexa] Stale customer ID detected, re-creating customer...");
-            await adminClient
-              .from("clients")
-              .update({ conexa_customer_id: null })
-              .eq("id", client_id);
 
-            conexaCustomerId = await ensureConexaCustomer(
-              { ...clientForGateway, conexa_customer_id: null },
-              conexaBaseUrl,
-              settings.conexa_api_key,
-              adminClient,
-              client_id,
-              settings.conexa_unit_id
-            );
-
+          // Create sale in Conexa (flat payload, no companyId)
+          let conexaResponse;
+          try {
             conexaResponse = await createConexaSale(
               conexaCustomerId,
               amount,
@@ -461,79 +548,143 @@ Deno.serve(async (req) => {
               description,
               settings.conexa_default_product_id,
               conexaBaseUrl,
-              settings.conexa_api_key
+              settings.conexa_api_key,
             );
-          } else {
-            throw saleError;
+          } catch (saleError: any) {
+            // If customer doesn't exist in Conexa anymore, clear stale ID and retry
+            if (saleError.message?.includes("Customer does not exist")) {
+              console.warn(
+                "[Conexa] Stale customer ID detected, re-creating customer...",
+              );
+              await adminClient
+                .from("clients")
+                .update({ conexa_customer_id: null })
+                .eq("id", client_id);
+
+              conexaCustomerId = await ensureConexaCustomer(
+                { ...clientForGateway, conexa_customer_id: null },
+                conexaBaseUrl,
+                settings.conexa_api_key,
+                adminClient,
+                client_id,
+                settings.conexa_unit_id,
+              );
+
+              conexaResponse = await createConexaSale(
+                conexaCustomerId,
+                amount,
+                due_date,
+                description,
+                settings.conexa_default_product_id,
+                conexaBaseUrl,
+                settings.conexa_api_key,
+              );
+            } else {
+              throw saleError;
+            }
+          }
+
+          // POST /sale returns { "id": 12345 } com status notBilled
+          saleId = conexaResponse.id ? String(conexaResponse.id) : null;
+          await logConexaApi(adminClient, {
+            agencyId: agency_id,
+            clientId: client_id,
+            operation: "sale_create",
+            endpoint: "/sale",
+            httpStatus: 200,
+            success: !!saleId,
+            responsePayload: conexaResponse,
+          });
+
+          if (saleId) {
+            conexa_sale_id = saleId;
+            conexa_billing_status = "sale_created";
           }
         }
 
-        // POST /sale returns { "id": 12345 } com status notBilled
-        const saleId = conexaResponse.id ? String(conexaResponse.id) : null;
-        await logConexaApi(adminClient, {
-          agencyId: agency_id,
-          clientId: client_id,
-          operation: "sale_create",
-          endpoint: "/sale",
-          httpStatus: 200,
-          success: !!saleId,
-          responsePayload: conexaResponse,
-        });
-
-        if (saleId) {
-          conexa_sale_id = saleId;
-          conexa_billing_status = "sale_created";
-
-          if (shouldAutoInvoice) {
-            // Criar cobrança via /charge — com invoicingMethodId se auto-boleto ativo
-            const { chargeId, raw: chargeCreateRaw } = await sharedCreateConexaCharge(
+        if (saleId && shouldAutoInvoice) {
+          // Criar cobrança via /charge — com invoicingMethodId se auto-boleto ativo
+          let chargeCreateRaw: unknown = null;
+          if (!conexa_charge_id) {
+            const createdCharge = await sharedCreateConexaCharge(
               adminClient,
               conexaCreds,
               {
                 saleId,
                 dueDate: due_date,
                 notes: description,
-                invoicingMethodId: autoBillet ? settings.conexa_invoicing_method_id : null,
+                invoicingMethodId: autoBillet
+                  ? settings.conexa_invoicing_method_id
+                  : null,
               },
               { agencyId: agency_id, clientId: client_id },
             );
-            conexa_charge_id = chargeId;
+            conexa_charge_id = createdCharge.chargeId;
+            chargeCreateRaw = createdCharge.raw;
             conexa_billing_status = "charge_created";
-
-            // Enriquecer com GET /charge/:id
-            const details = await getConexaCharge(adminClient, conexaCreds, chargeId, {
-              agencyId: agency_id,
-              clientId: client_id,
-            });
-            conexa_charge_url = details.chargeUrl;
-            conexa_invoice_url = details.chargeUrl; // legado
-            conexa_billet_url = details.billetUrl;
-            conexa_raw_charge = details.raw ?? chargeCreateRaw;
-
-            if (details.billetUrl) {
-              conexa_billing_status = "billet_available";
-            } else if (autoBillet) {
-              conexa_billing_status = "charge_created_without_billet";
-              return jsonResponse({
-                error: `Conexa criou a cobrança ${chargeId}, mas o boleto Efí não foi gerado. Isso geralmente acontece quando o Meio de Faturamento selecionado não está corretamente vinculado ao Efí no painel do Conexa, ou quando o ID do Meio de Faturamento está ausente. Vá em Configurações → Integrações → Conexa, clique em 'Buscar meios de faturamento' e selecione novamente o meio Boleto Efí antes de salvar.`,
-              }, 422);
-            }
-
-            // Pix opcional
-            const pix = await getConexaPix(adminClient, conexaCreds, chargeId, {
-              agencyId: agency_id,
-              clientId: client_id,
-            });
-            if (pix) {
-              conexa_pix_copy_paste = pix.copyPasteCode;
-              conexa_pix_qr_code = pix.qrCode;
-            }
-
-            conexa_last_sync_at = new Date().toISOString();
+          } else {
+            console.log(
+              `[Gateway] Reusing existing Conexa charge ${conexa_charge_id}`,
+            );
           }
+
+          if (!conexa_charge_id) {
+            throw new Error(
+              "Conexa charge id unavailable after charge preparation.",
+            );
+          }
+
+          // Enriquecer com GET /charge/:id
+          const details = await getConexaCharge(
+            adminClient,
+            conexaCreds,
+            conexa_charge_id,
+            {
+              agencyId: agency_id,
+              clientId: client_id,
+            },
+          );
+          conexa_charge_url = details.chargeUrl;
+          conexa_invoice_url = details.chargeUrl; // legado
+          conexa_billet_url = details.billetUrl;
+          conexa_raw_charge = details.raw ?? chargeCreateRaw;
+
+          if (details.billetUrl) {
+            conexa_billing_status = "billet_available";
+          } else if (autoBillet) {
+            conexa_billing_status = "charge_created_without_billet";
+            return jsonResponse(
+              {
+                error: `Conexa criou a cobrança ${conexa_charge_id}, mas o boleto Efí não foi gerado. Isso geralmente acontece quando o Meio de Faturamento selecionado não está corretamente vinculado ao Efí no painel do Conexa, ou quando o ID do Meio de Faturamento está ausente. Vá em Configurações → Integrações → Conexa, clique em 'Buscar meios de faturamento' e selecione novamente o meio Boleto Efí antes de salvar.`,
+              },
+              422,
+            );
+          }
+
+          // Pix opcional
+          const pix = await getConexaPix(
+            adminClient,
+            conexaCreds,
+            conexa_charge_id,
+            {
+              agencyId: agency_id,
+              clientId: client_id,
+            },
+          );
+          if (pix) {
+            conexa_pix_copy_paste = pix.copyPasteCode;
+            conexa_pix_qr_code = pix.qrCode;
+          }
+
+          conexa_last_sync_at = new Date().toISOString();
         }
       }
     }
+
+    const externalChargeGenerated =
+      (effectiveBillingType === "asaas" && !!asaas_payment_id) ||
+      (effectiveBillingType === "conexa" &&
+        (!!conexa_charge_id || !!conexa_sale_id));
 
     // 5. UPSERT or INSERT into client_payments
     const finalPayload = {
@@ -559,6 +710,16 @@ Deno.serve(async (req) => {
       conexa_billing_status,
       conexa_last_sync_at,
       gateway_fee,
+      ...(externalChargeGenerated
+        ? {
+            generation_status: "generated",
+            generation_last_error: null,
+            generation_next_attempt_at: null,
+            generation_locked_at: null,
+            generation_locked_by: null,
+            generated_at: new Date().toISOString(),
+          }
+        : {}),
     };
 
     let result;
@@ -585,14 +746,15 @@ Deno.serve(async (req) => {
       console.error("DB error:", dbError);
       return jsonResponse(
         { error: "Failed to save payment", details: dbError.message },
-        500
+        500,
       );
     }
 
     return jsonResponse({ success: true, payment });
   } catch (err: unknown) {
     console.error("Unhandled error:", err);
-    const message = err instanceof Error ? err.message : "Internal server error";
+    const message =
+      err instanceof Error ? err.message : "Internal server error";
     return jsonResponse({ error: message }, 500);
   }
 });

@@ -215,7 +215,8 @@ export function AdvancedFinancialSheet({
         const dueDate = `${selectedMonth}-${String(dueDay).padStart(2, '0')}`;
         const billingType = client.default_billing_type || 'manual';
 
-        const { error: invokeError } = await supabase.functions.invoke('create-gateway-charge', {
+        const functionName = billingType === 'stripe' ? 'create-agency-stripe-charge' : 'create-gateway-charge';
+        const { error: invokeError } = await supabase.functions.invoke(functionName, {
           body: {
             client_id: client.id,
             amount: client.monthly_value,

@@ -1974,6 +1974,7 @@ export type Database = {
           amount: number
           amount_paid: number | null
           asaas_payment_id: string | null
+          billing_cycle_month: string | null
           billing_type: string | null
           client_id: string
           conexa_billet_url: string | null
@@ -1990,11 +1991,20 @@ export type Database = {
           description: string | null
           due_date: string
           gateway_fee: number | null
+          generated_at: string | null
+          generation_attempts: number
+          generation_last_attempt_at: string | null
+          generation_last_error: string | null
+          generation_locked_at: string | null
+          generation_locked_by: string | null
+          generation_next_attempt_at: string | null
+          generation_status: string
           id: string
           invoice_url: string | null
           paid_at: string | null
           paid_date: string | null
           pix_copy_paste: string | null
+          source: string
           status: Database["public"]["Enums"]["payment_status"]
           stripe_checkout_session_id: string | null
           stripe_checkout_url: string | null
@@ -2006,6 +2016,7 @@ export type Database = {
           amount: number
           amount_paid?: number | null
           asaas_payment_id?: string | null
+          billing_cycle_month?: string | null
           billing_type?: string | null
           client_id: string
           conexa_billet_url?: string | null
@@ -2022,11 +2033,20 @@ export type Database = {
           description?: string | null
           due_date: string
           gateway_fee?: number | null
+          generated_at?: string | null
+          generation_attempts?: number
+          generation_last_attempt_at?: string | null
+          generation_last_error?: string | null
+          generation_locked_at?: string | null
+          generation_locked_by?: string | null
+          generation_next_attempt_at?: string | null
+          generation_status?: string
           id?: string
           invoice_url?: string | null
           paid_at?: string | null
           paid_date?: string | null
           pix_copy_paste?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_checkout_session_id?: string | null
           stripe_checkout_url?: string | null
@@ -2038,6 +2058,7 @@ export type Database = {
           amount?: number
           amount_paid?: number | null
           asaas_payment_id?: string | null
+          billing_cycle_month?: string | null
           billing_type?: string | null
           client_id?: string
           conexa_billet_url?: string | null
@@ -2054,11 +2075,20 @@ export type Database = {
           description?: string | null
           due_date?: string
           gateway_fee?: number | null
+          generated_at?: string | null
+          generation_attempts?: number
+          generation_last_attempt_at?: string | null
+          generation_last_error?: string | null
+          generation_locked_at?: string | null
+          generation_locked_by?: string | null
+          generation_next_attempt_at?: string | null
+          generation_status?: string
           id?: string
           invoice_url?: string | null
           paid_at?: string | null
           paid_date?: string | null
           pix_copy_paste?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_checkout_session_id?: string | null
           stripe_checkout_url?: string | null
