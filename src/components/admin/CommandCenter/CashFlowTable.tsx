@@ -62,7 +62,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
     : null;
 
   const gatewayLabel = (bt?: string) =>
-    bt === 'asaas' ? 'Asaas' : bt === 'conexa' ? 'Conexa' : 'Gateway';
+    bt === 'asaas' ? 'Asaas' : bt === 'conexa' ? 'Conexa' : bt === 'stripe' ? 'Stripe' : 'Gateway';
 
   const handleRevertPayment = useCallback(async () => {
     if (!revertItem) return;
@@ -296,7 +296,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                           {item.title}
                           {item.type === 'INCOME' && item.billingType && item.billingType !== 'manual' && (
                             <Badge variant="outline" className="text-[10px] px-1 py-0 font-normal">
-                              {item.billingType === 'asaas' ? 'Asaas' : 'Conexa'}
+                              {item.billingType === 'asaas' ? 'Asaas' : item.billingType === 'stripe' ? 'Stripe' : 'Conexa'}
                             </Badge>
                           )}
                         </div>
