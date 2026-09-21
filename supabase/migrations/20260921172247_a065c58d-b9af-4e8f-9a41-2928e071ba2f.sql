@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.offboard_client(uuid, uuid[], uuid[]) FROM anon;
