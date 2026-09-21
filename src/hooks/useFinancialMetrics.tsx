@@ -35,6 +35,8 @@ export interface ClientPayment {
   description?: string | null;
   gateway_fee?: number | null;
   amount_paid?: number | null;
+  preserved_after_deactivation?: boolean;
+  preserved_at?: string | null;
 }
 
 export interface Expense {
@@ -124,14 +126,24 @@ const wasClientActiveInMonth = (client: Client, monthStr: string): boolean => {
   if (client.active) return true;
   if (client.cancelled_at) {
     const [year, month] = monthStr.split('-').map(Number);
-    const monthEnd = new Date(year, month, 0, 23, 59, 59);
+    const monthStart = new Date(year, month - 1, 1);
     const cancelledDate = new Date(client.cancelled_at);
-    return cancelledDate > monthEnd;
+    return cancelledDate >= monthStart;
   }
   return false;
 };
 
 export { wasClientActiveInMonth };
+
+export const shouldIncludeOpenPayment = (
+  payment: Pick<ClientPayment, 'status' | 'preserved_after_deactivation'>,
+  client: Client,
+  monthStr: string,
+): boolean => {
+  if (payment.status === 'paid') return true;
+  if (payment.status === 'cancelled') return false;
+  return payment.preserved_after_deactivation === true || wasClientActiveInMonth(client, monthStr);
+};
 
 export function useFinancialMetrics(agencyId: string | undefined, selectedMonth: string) {
   const { toast } = useToast();
@@ -443,7 +455,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         if (!['overdue', 'pending'].includes(p.status)) return false;
         if (p.due_date >= today) return false;
         const client = clients.find(c => c.id === p.client_id);
-        return client && wasClientActiveInMonth(client, selectedMonth);
+        return client && shouldIncludeOpenPayment(p, client, selectedMonth);
       })
       .reduce((sum, p) => sum + p.amount, 0);
   }, [paymentsInMonth, today, clients, selectedMonth]);
@@ -455,9 +467,9 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         if (p.status === 'cancelled') return false;
         // Pagamentos pagos: dinheiro real, sempre conta (histórico imutável)
         if (p.status === 'paid') return true;
-        // Pendentes/atrasados: só contam se cliente estava ativo no mês
+        // Cobranças preservadas continuam válidas mesmo após a inativação.
         const client = clients.find(c => c.id === p.client_id);
-        return client && wasClientActiveInMonth(client, selectedMonth);
+        return client && shouldIncludeOpenPayment(p, client, selectedMonth);
       })
       .reduce((sum, p) => sum + p.amount, 0);
   }, [paymentsInMonth, clients, selectedMonth]);
@@ -506,10 +518,9 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     paymentsInMonth.forEach(p => {
       const client = clients.find(c => c.id === p.client_id);
       if (!client) return;
-      // Pagamentos pagos: histórico imutável, sempre exibir mesmo se cliente foi desativado.
-      // Demais status (pending/overdue/cancelled): ocultar se cliente já não estava ativo no mês,
-      // para não poluir a projeção com cobranças de clientes desligados.
-      if (p.status !== 'paid' && !wasClientActiveInMonth(client, selectedMonth)) return;
+      // Pagamentos pagos são históricos; cobranças preservadas continuam no caixa.
+      // Canceladas permanecem visíveis na lista, mas não entram nos totais.
+      if (p.status !== 'cancelled' && !shouldIncludeOpenPayment(p, client, selectedMonth)) return;
       items.push({
         id: p.id,
         title: client.name,
