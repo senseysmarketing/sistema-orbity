@@ -126,9 +126,9 @@ const wasClientActiveInMonth = (client: Client, monthStr: string): boolean => {
   if (client.active) return true;
   if (client.cancelled_at) {
     const [year, month] = monthStr.split('-').map(Number);
-    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0, 23, 59, 59);
     const cancelledDate = new Date(client.cancelled_at);
-    return cancelledDate >= monthStart;
+    return cancelledDate > monthEnd;
   }
   return false;
 };

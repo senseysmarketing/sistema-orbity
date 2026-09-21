@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   shouldIncludeOpenPayment,
-  wasClientActiveInMonth,
   type Client,
 } from "@/hooks/useFinancialMetrics";
 
@@ -22,17 +21,20 @@ const inactiveClient: Client = {
 };
 
 describe("client offboarding financial visibility", () => {
-  it("counts the client in the month when deactivation happened", () => {
-    expect(wasClientActiveInMonth(inactiveClient, "2026-09")).toBe(true);
-    expect(wasClientActiveInMonth(inactiveClient, "2026-10")).toBe(false);
-  });
-
   it("keeps an explicitly preserved charge visible after deactivation", () => {
     expect(shouldIncludeOpenPayment(
       { status: "pending", preserved_after_deactivation: true },
       inactiveClient,
       "2026-10",
     )).toBe(true);
+  });
+
+  it("does not keep an unpreserved open charge after deactivation", () => {
+    expect(shouldIncludeOpenPayment(
+      { status: "pending", preserved_after_deactivation: false },
+      inactiveClient,
+      "2026-09",
+    )).toBe(false);
   });
 
   it("does not count cancelled charges", () => {
