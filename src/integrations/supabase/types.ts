@@ -2082,6 +2082,8 @@ export type Database = {
           paid_at: string | null
           paid_date: string | null
           pix_copy_paste: string | null
+          preserved_after_deactivation: boolean
+          preserved_at: string | null
           source: string
           status: Database["public"]["Enums"]["payment_status"]
           stripe_checkout_session_id: string | null
@@ -2124,6 +2126,8 @@ export type Database = {
           paid_at?: string | null
           paid_date?: string | null
           pix_copy_paste?: string | null
+          preserved_after_deactivation?: boolean
+          preserved_at?: string | null
           source?: string
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_checkout_session_id?: string | null
@@ -2166,6 +2170,8 @@ export type Database = {
           paid_at?: string | null
           paid_date?: string | null
           pix_copy_paste?: string | null
+          preserved_after_deactivation?: boolean
+          preserved_at?: string | null
           source?: string
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_checkout_session_id?: string | null
@@ -8541,6 +8547,14 @@ export type Database = {
         Args: { p_duplicates: string[]; p_primary: string }
         Returns: undefined
       }
+      offboard_client: {
+        Args: {
+          p_cancel_payment_ids?: string[]
+          p_client_id: string
+          p_preserve_payment_ids?: string[]
+        }
+        Returns: Json
+      }
       relink_orphan_whatsapp_conversations: {
         Args: { p_agency_id: string }
         Returns: {
@@ -8585,6 +8599,8 @@ export type Database = {
           paid_at: string | null
           paid_date: string | null
           pix_copy_paste: string | null
+          preserved_after_deactivation: boolean
+          preserved_at: string | null
           source: string
           status: Database["public"]["Enums"]["payment_status"]
           stripe_checkout_session_id: string | null
