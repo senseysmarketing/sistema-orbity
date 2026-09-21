@@ -1,0 +1,1 @@
+ALTER FUNCTION public.offboard_client(uuid, uuid[], uuid[]) SECURITY INVOKER;

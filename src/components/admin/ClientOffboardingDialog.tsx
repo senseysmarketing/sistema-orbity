@@ -61,7 +61,7 @@ export function ClientOffboardingDialog({
           .from("client_payments")
           .select("*")
           .eq("client_id", client.id)
-          .eq("status", "pending")
+          .in("status", ["pending", "overdue"])
           .order("due_date", { ascending: true });
         if (error) throw error;
         if (cancelled) return;
@@ -126,25 +126,13 @@ export function ClientOffboardingDialog({
     setSubmitting(true);
     try {
       const toCancel = pendingPayments.filter((p) => decisions[p.id] === "cancel");
-      const stamp = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-
-      for (const p of toCancel) {
-        const noteSuffix = `Cancelado via Offboarding em ${stamp}`;
-        const newDescription = p.description
-          ? `${p.description}\n[${noteSuffix}]`
-          : `[${noteSuffix}]`;
-        const { error: cancelErr } = await supabase
-          .from("client_payments")
-          .update({ status: "cancelled" as any, description: newDescription })
-          .eq("id", p.id);
-        if (cancelErr) throw cancelErr;
-      }
-
-      const { error: deactErr } = await supabase
-        .from("clients")
-        .update({ active: false, cancelled_at: new Date().toISOString() })
-        .eq("id", client.id);
-      if (deactErr) throw deactErr;
+      const toPreserve = pendingPayments.filter((p) => decisions[p.id] === "keep");
+      const { error } = await supabase.rpc("offboard_client", {
+        p_client_id: client.id,
+        p_cancel_payment_ids: toCancel.map((payment) => payment.id),
+        p_preserve_payment_ids: toPreserve.map((payment) => payment.id),
+      });
+      if (error) throw error;
 
       toast({
         title: "Cliente desativado",
