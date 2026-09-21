@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1465,6 +1465,84 @@ export type Database = {
             columns: ["next_step_id"]
             isOneToOne: false
             referencedRelation: "automation_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_generation_logs: {
+        Row: {
+          agency_id: string
+          attempt: number | null
+          billing_type: string | null
+          client_id: string | null
+          created_at: string
+          event: string
+          id: string
+          message: string | null
+          metadata: Json
+          payment_id: string | null
+          status: string
+        }
+        Insert: {
+          agency_id: string
+          attempt?: number | null
+          billing_type?: string | null
+          client_id?: string | null
+          created_at?: string
+          event: string
+          id?: string
+          message?: string | null
+          metadata?: Json
+          payment_id?: string | null
+          status: string
+        }
+        Update: {
+          agency_id?: string
+          attempt?: number | null
+          billing_type?: string | null
+          client_id?: string | null
+          created_at?: string
+          event?: string
+          id?: string
+          message?: string | null
+          metadata?: Json
+          payment_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_generation_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_generation_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "billing_generation_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "billing_generation_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_generation_logs_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "client_payments"
             referencedColumns: ["id"]
           },
         ]
@@ -8451,6 +8529,10 @@ export type Database = {
       is_master_agency_admin: { Args: never; Returns: boolean }
       is_master_user: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      is_valid_billing_worker_secret: {
+        Args: { p_secret: string }
+        Returns: boolean
+      }
       master_get_agency_details: {
         Args: { p_agency_id: string }
         Returns: Json
@@ -8465,6 +8547,57 @@ export type Database = {
           linked_count: number
           total_orphans: number
         }[]
+      }
+      reserve_billing_generation_payments: {
+        Args: { p_limit?: number; p_worker_id?: string }
+        Returns: {
+          agency_id: string | null
+          amount: number
+          amount_paid: number | null
+          asaas_payment_id: string | null
+          billing_cycle_month: string | null
+          billing_type: string | null
+          client_id: string
+          conexa_billet_url: string | null
+          conexa_billing_status: string | null
+          conexa_charge_id: string | null
+          conexa_charge_url: string | null
+          conexa_invoice_url: string | null
+          conexa_last_sync_at: string | null
+          conexa_pix_copy_paste: string | null
+          conexa_pix_qr_code: string | null
+          conexa_raw_charge: Json | null
+          conexa_sale_id: string | null
+          created_at: string
+          description: string | null
+          due_date: string
+          gateway_fee: number | null
+          generated_at: string | null
+          generation_attempts: number
+          generation_last_attempt_at: string | null
+          generation_last_error: string | null
+          generation_locked_at: string | null
+          generation_locked_by: string | null
+          generation_next_attempt_at: string | null
+          generation_status: string
+          id: string
+          invoice_url: string | null
+          paid_at: string | null
+          paid_date: string | null
+          pix_copy_paste: string | null
+          source: string
+          status: Database["public"]["Enums"]["payment_status"]
+          stripe_checkout_session_id: string | null
+          stripe_checkout_url: string | null
+          stripe_payment_intent_id: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "client_payments"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       should_notify_user_for_event: {
         Args: {
@@ -8560,12 +8693,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -8589,11 +8722,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -8614,11 +8747,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -8639,11 +8772,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -8656,11 +8789,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
