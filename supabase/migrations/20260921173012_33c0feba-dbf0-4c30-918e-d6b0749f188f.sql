@@ -1,0 +1,1 @@
+GRANT SELECT ON public.agency_users TO authenticated;
