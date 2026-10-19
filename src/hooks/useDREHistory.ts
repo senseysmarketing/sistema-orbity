@@ -24,7 +24,7 @@ async function fetchAll(
       .order("id", { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
     if (error) throw new Error("Falha ao consultar " + table + ": " + error.message);
-    const page = (data ?? []) as Record<string, unknown>[];
+    const page = (data ?? []) as unknown as Record<string, unknown>[];
     rows.push(...page);
     if (page.length < PAGE_SIZE) break;
   }

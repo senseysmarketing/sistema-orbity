@@ -1,4 +1,4 @@
-// ID da agência master (Senseys - Marketing Imobiliário)
+// ID da agência master (Senseys - Digital Performance LTDA)
 // Esta é a única agência que terá acesso ao Painel de Controle
 export const MASTER_AGENCY_ID = '7bef1258-af3d-48cc-b3a7-f79fac29c7c0';
 
