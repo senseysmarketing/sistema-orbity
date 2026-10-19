@@ -611,6 +611,7 @@ export default function Admin() {
         cashFlow={metrics.unifiedCashFlow}
         expensesByCategory={metrics.expensesByCategory}
         agencyId={currentAgency?.id || ""}
+        agencyName={currentAgency?.name || "Agência"}
         selectedMonth={selectedMonth}
         forecastClients={metrics.forecastClients}
         forecastRecurringExpenses={metrics.forecastRecurringExpenses}
