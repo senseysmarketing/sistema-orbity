@@ -91,6 +91,7 @@ export interface CashFlowItem {
   id: string;
   title: string;
   amount: number;
+  billedAmount?: number;
   dueDate: string;
   type: 'INCOME' | 'EXPENSE';
   status: 'PAID' | 'PENDING' | 'OVERDUE' | 'CANCELLED';
@@ -525,6 +526,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         id: p.id,
         title: client.name,
         amount: p.status === 'paid' ? (p.amount_paid || p.amount) : p.amount,
+        billedAmount: p.amount,
         dueDate: p.due_date,
         type: 'INCOME',
         status: mapStatus(p.status),
