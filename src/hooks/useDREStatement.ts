@@ -1,18 +1,8 @@
 import { useMemo } from 'react';
 import type { CashFlowItem } from './useFinancialMetrics';
-
-const TAX_KEYWORDS = [
-  'imposto', 'tributo', 'taxa', 'das', 'simples',
-  'iss', 'irpj', 'csll', 'pis', 'cofins',
-];
+import { calculateDRE, isTaxCategory } from '@/lib/dre';
 
 const FALLBACK_TAX_RATE = 0.06;
-
-const isTaxCategory = (category?: string): boolean => {
-  if (!category) return false;
-  const c = category.toLowerCase().trim();
-  return TAX_KEYWORDS.some(k => c.includes(k));
-};
 
 const sum = (arr: CashFlowItem[]): number =>
   arr.reduce((acc, i) => acc + (i.amount || 0), 0);
@@ -84,43 +74,8 @@ export function useDREStatement({
       };
     }
 
-    // Real mode
-    const incomes = cashFlow.filter(
-      i => i.type === 'INCOME' && i.status === 'PAID'
-    );
-    const expensesItems = cashFlow.filter(
-      i =>
-        i.type === 'EXPENSE' &&
-        i.status !== 'CANCELLED' &&
-        i.sourceType === 'expense'
-    );
-    const salariesItems = cashFlow.filter(
-      i =>
-        i.type === 'EXPENSE' &&
-        i.status !== 'CANCELLED' &&
-        i.sourceType === 'salary'
-    );
-
-    const receitaBruta = sum(incomes);
-    const impostos = sum(expensesItems.filter(e => isTaxCategory(e.category)));
-    const custosOper = sum(expensesItems.filter(e => !isTaxCategory(e.category)));
-    const folhaPag = sum(salariesItems);
-    const receitaLiquida = receitaBruta - impostos;
-    const ebitda = receitaLiquida - custosOper - folhaPag;
-    const margemPct = receitaBruta > 0 ? (ebitda / receitaBruta) * 100 : 0;
-    const effectiveTaxRate = receitaBruta > 0 ? impostos / receitaBruta : 0;
-
-    return {
-      receitaBruta,
-      impostos,
-      receitaLiquida,
-      custosOper,
-      folhaPag,
-      ebitda,
-      margemPct,
-      effectiveTaxRate,
-      isProjectedTax: false,
-    };
+    // Real mode: mesmos critérios de competência usados pela exportação.
+    return { ...calculateDRE(cashFlow), isProjectedTax: false };
   }, [
     cashFlow,
     isForecastMode,

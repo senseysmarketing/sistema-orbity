@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,6 +24,10 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { useAdvancedAnalytics } from "@/hooks/useAdvancedAnalytics";
 import { useDREStatement } from "@/hooks/useDREStatement";
+import { useDREHistory } from "@/hooks/useDREHistory";
+import { validateDREPeriod, listDREMonths } from "@/lib/dre";
+import { DREReportPdf } from "./DREReportPdf";
+import { pdf } from "@react-pdf/renderer";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -36,6 +41,7 @@ interface AdvancedFinancialSheetProps {
   cashFlow: CashFlowItem[];
   expensesByCategory: CategoryTotal[];
   agencyId: string;
+  agencyName?: string;
   selectedMonth: string;
   // Forecast data (optional — falls back to safe empty arrays)
   forecastClients?: Client[];
@@ -54,13 +60,20 @@ interface ProjectionRow {
 }
 
 export function AdvancedFinancialSheet({
-  open, onOpenChange, cashFlow, expensesByCategory, agencyId, selectedMonth,
+  open, onOpenChange, cashFlow, expensesByCategory, agencyId, agencyName, selectedMonth,
   forecastClients = [], forecastRecurringExpenses = [], employees = [],
   paymentsAll = [], isForecastMode = false, historicalCashFlow = [],
 }: AdvancedFinancialSheetProps) {
   const defaultYear = selectedMonth.split('-')[0];
   const [selectedYear, setSelectedYear] = useState(defaultYear);
   const [activeTab, setActiveTab] = useState<string>(isForecastMode ? "forecast" : "current");
+  // O período do PDF é independente do mês global do Centro Financeiro.
+  const today = new Date();
+  const currentMonth = String(today.getFullYear()) + "-" + String(today.getMonth() + 1).padStart(2, "0");
+  const initialReportMonth = selectedMonth > currentMonth ? currentMonth : selectedMonth;
+  const [startMonth, setStartMonth] = useState(initialReportMonth);
+  const [endMonth, setEndMonth] = useState(initialReportMonth);
+  const [isExportingDRE, setIsExportingDRE] = useState(false);
   const [isBatching, setIsBatching] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   const { toast } = useToast();
@@ -98,7 +111,7 @@ export function AdvancedFinancialSheet({
   );
 
   // ============ DRE STATEMENT ============
-  const dre = useDREStatement({
+  const fallbackDRE = useDREStatement({
     cashFlow,
     isForecastMode,
     totalForecastMRR,
@@ -106,6 +119,23 @@ export function AdvancedFinancialSheet({
     totalForecastFixed,
     historicalCashFlow,
   });
+
+  useEffect(() => {
+    if (!open) return;
+    const month = selectedMonth > currentMonth ? currentMonth : selectedMonth;
+    setStartMonth(month);
+    setEndMonth(month);
+  }, [open, selectedMonth, currentMonth]);
+
+  const periodError = validateDREPeriod(startMonth, endMonth, currentMonth);
+  const dreHistory = useDREHistory(agencyId, startMonth, endMonth, open && activeTab === "dre" && !periodError);
+  const periodMonthCount = !periodError ? listDREMonths(startMonth, endMonth).length : 0;
+  // Mesmo dataset usado pelo PDF, independentemente de cliente hoje inativo ou valor já recebido.
+  const displayedHistory = useDREHistory(agencyId, selectedMonth, selectedMonth, open && activeTab === "dre" && !isForecastMode);
+  const displayedReady = isForecastMode || (!!displayedHistory.data?.length && !displayedHistory.isError);
+  const dre = !isForecastMode && displayedHistory.data?.[0]
+    ? { ...displayedHistory.data[0].values, isProjectedTax: false }
+    : fallbackDRE;
 
   const handleCopyDRE = async () => {
     const fmt = (v: number) => formatCurrency(v).padStart(16);
@@ -117,8 +147,8 @@ export function AdvancedFinancialSheet({
       `= Receita Líquida:    ${fmt(dre.receitaLiquida)}`,
       `(–) Custos Oper.:     ${fmt(dre.custosOper)}`,
       `(–) Folha Pgto:       ${fmt(dre.folhaPag)}`,
-      `= EBITDA:             ${fmt(dre.ebitda)}`,
-      `Margem Líquida:       ${dre.margemPct.toFixed(1)}%`,
+      `= Resultado Operacional: ${fmt(dre.ebitda)}`,
+      `Margem Operacional:   ${dre.margemPct.toFixed(1)}%`,
     ].join('\n');
 
     try {
@@ -129,8 +159,33 @@ export function AdvancedFinancialSheet({
     }
   };
 
-  const handlePrintDRE = () => {
-    window.print();
+  const handleExportDRE = async () => {
+    if (periodError || isExportingDRE) return;
+    setIsExportingDRE(true);
+    try {
+      // Revalidar a consulta antes do download; nunca entregar arquivo parcial.
+      const { data, error } = await dreHistory.refetch();
+      if (error) throw error;
+      if (!data || data.length !== periodMonthCount) throw new Error("Histórico incompleto. Tente novamente.");
+      const issuedAt = new Date().toLocaleString("pt-BR");
+      const blob = await pdf(
+        <DREReportPdf agencyName={agencyName || "Agência"} months={data} currentMonth={currentMonth} issuedAt={issuedAt} />
+      ).toBlob();
+      if (!blob.size) throw new Error("Não foi possível gerar o arquivo PDF.");
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "DRE_Orbity_" + startMonth + "_a_" + endMonth + ".pdf";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      toast({ title: "PDF gerado", description: periodMonthCount + " competência(s) exportada(s)." });
+    } catch (err) {
+      toast({ title: "Erro ao exportar DRE", description: err instanceof Error ? err.message : "Falha na exportação.", variant: "destructive" });
+    } finally {
+      setIsExportingDRE(false);
+    }
   };
 
   // 90-day chart data: M+1, M+2, M+3 from current real month
@@ -588,22 +643,52 @@ export function AdvancedFinancialSheet({
 
           {/* ============ TAB C: DRE / CONTABILIDADE ============ */}
           <TabsContent value="dre" className="space-y-4 mt-6">
-            <div className="flex items-center gap-2 no-print">
-              <Button size="sm" variant="outline" onClick={handleCopyDRE} className="gap-1.5">
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" disabled={!displayedReady} onClick={handleCopyDRE} className="gap-1.5">
                 <Copy className="h-3.5 w-3.5" />
-                Copiar Resumo
+                Copiar resumo do mês exibido
               </Button>
-              <Button size="sm" onClick={handlePrintDRE} className="gap-1.5">
-                <Printer className="h-3.5 w-3.5" />
-                Imprimir PDF
+            </div>
+            <div className="rounded-md border p-3 space-y-3">
+              <p className="text-sm font-medium">Exportar DRE histórica (1 a 12 meses)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1 text-xs text-muted-foreground">
+                  Mês inicial
+                  <Input aria-label="Mês inicial da DRE" type="month" max={currentMonth} value={startMonth} onChange={(e) => setStartMonth(e.target.value)} />
+                </label>
+                <label className="space-y-1 text-xs text-muted-foreground">
+                  Mês final
+                  <Input aria-label="Mês final da DRE" type="month" max={currentMonth} value={endMonth} onChange={(e) => setEndMonth(e.target.value)} />
+                </label>
+              </div>
+              {periodError ? (
+                <p role="alert" className="text-xs text-destructive">{periodError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">{periodMonthCount} competência(s) no PDF. O demonstrativo abaixo continua exibindo {monthLabel}.</p>
+              )}
+              {dreHistory.isError && !periodError && (
+                <div className="flex items-center gap-2">
+                  <p role="alert" className="text-xs text-destructive">Falha ao consultar dados históricos.</p>
+                  <Button size="sm" variant="outline" onClick={() => dreHistory.refetch()}>Tentar novamente</Button>
+                </div>
+              )}
+              <Button size="sm" onClick={handleExportDRE} disabled={!!periodError || dreHistory.isLoading || dreHistory.isFetching || dreHistory.isError || isExportingDRE} className="gap-1.5">
+                {isExportingDRE ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
+                {isExportingDRE ? "Gerando PDF..." : dreHistory.isFetching ? "Carregando histórico..." : "Exportar PDF"}
               </Button>
             </div>
 
-            <div id="dre-print-area">
+            {!displayedReady ? (
+              <div className="space-y-2 text-sm text-muted-foreground">
+                {displayedHistory.isError ? "Falha ao carregar a DRE do mês exibido." : "Carregando DRE do mês exibido..."}
+                {displayedHistory.isError && <Button size="sm" variant="outline" onClick={() => displayedHistory.refetch()}>Tentar novamente</Button>}
+              </div>
+            ) : (
+            <div>
               <div className="mb-4 space-y-1">
                 <h2 className="text-lg font-semibold">DRE — {monthLabel}</h2>
                 <p className="text-xs text-muted-foreground">
-                  Demonstração do Resultado do Exercício
+                  Demonstração gerencial do resultado
                   {isForecastMode && (
                     <Badge variant="outline" className="ml-2 text-xs">
                       Modo Projeção
@@ -664,7 +749,7 @@ export function AdvancedFinancialSheet({
                     </TableRow>
                     <TableRow className="bg-muted/30">
                       <TableCell className="font-semibold">
-                        = Lucro Operacional (EBITDA)
+                        = Resultado operacional gerencial
                       </TableCell>
                       <TableCell
                         className={`text-right tabular-nums font-semibold ${
@@ -677,7 +762,7 @@ export function AdvancedFinancialSheet({
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell className="font-medium">Margem de Lucro Líquido</TableCell>
+                      <TableCell className="font-medium">Margem operacional</TableCell>
                       <TableCell
                         className={`text-right tabular-nums font-medium ${
                           dre.margemPct >= 0
@@ -693,10 +778,12 @@ export function AdvancedFinancialSheet({
               </div>
 
               <p className="text-[10px] text-muted-foreground mt-3">
-                Impostos identificados por categoria contendo: imposto, tributo, taxa, DAS, Simples, ISS, IRPJ, CSLL, PIS, COFINS.
-                {dre.isProjectedTax && ' Em modo projeção, impostos são estimados via taxa histórica do mês anterior.'}
+                Relatório gerencial: competência aproximada pelo vencimento; não substitui DRE contábil.
+                Impostos são identificados por categorias tributárias (taxas operacionais não são consideradas tributos).
+                {dre.isProjectedTax && ' A DRE exibida está em modo projeção; o PDF exporta apenas registros históricos. Impostos projetados usam a taxa histórica do mês anterior.'}
               </p>
             </div>
+            )}
           </TabsContent>
         </Tabs>
       </SheetContent>
