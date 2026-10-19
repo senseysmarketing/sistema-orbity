@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MB limit
+        maximumFileSizeToCacheInBytes: 16 * 1024 * 1024, // 16 MB limit
         // REMOVIDO: runtimeCaching para Supabase - causava problemas de sincronização
         // O cache de API estava interferindo com mudanças de aba
         runtimeCaching: [],
