@@ -111,7 +111,7 @@ export function AdvancedFinancialSheet({
   );
 
   // ============ DRE STATEMENT ============
-  const dre = useDREStatement({
+  const fallbackDRE = useDREStatement({
     cashFlow,
     isForecastMode,
     totalForecastMRR,
@@ -130,6 +130,12 @@ export function AdvancedFinancialSheet({
   const periodError = validateDREPeriod(startMonth, endMonth, currentMonth);
   const dreHistory = useDREHistory(agencyId, startMonth, endMonth, open && activeTab === "dre" && !periodError);
   const periodMonthCount = !periodError ? listDREMonths(startMonth, endMonth).length : 0;
+  // Mesmo dataset usado pelo PDF, independentemente de cliente hoje inativo ou valor já recebido.
+  const displayedHistory = useDREHistory(agencyId, selectedMonth, selectedMonth, open && activeTab === "dre" && !isForecastMode);
+  const displayedReady = isForecastMode || (!!displayedHistory.data?.length && !displayedHistory.isError);
+  const dre = !isForecastMode && displayedHistory.data?.[0]
+    ? { ...displayedHistory.data[0].values, isProjectedTax: false }
+    : fallbackDRE;
 
   const handleCopyDRE = async () => {
     const fmt = (v: number) => formatCurrency(v).padStart(16);
@@ -638,7 +644,7 @@ export function AdvancedFinancialSheet({
           {/* ============ TAB C: DRE / CONTABILIDADE ============ */}
           <TabsContent value="dre" className="space-y-4 mt-6">
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={handleCopyDRE} className="gap-1.5">
+              <Button size="sm" variant="outline" disabled={!displayedReady} onClick={handleCopyDRE} className="gap-1.5">
                 <Copy className="h-3.5 w-3.5" />
                 Copiar resumo do mês exibido
               </Button>
@@ -660,13 +666,24 @@ export function AdvancedFinancialSheet({
               ) : (
                 <p className="text-xs text-muted-foreground">{periodMonthCount} competência(s) no PDF. O demonstrativo abaixo continua exibindo {monthLabel}.</p>
               )}
-              {dreHistory.isError && !periodError && <p role="alert" className="text-xs text-destructive">Falha ao consultar dados históricos. Tente novamente.</p>}
+              {dreHistory.isError && !periodError && (
+                <div className="flex items-center gap-2">
+                  <p role="alert" className="text-xs text-destructive">Falha ao consultar dados históricos.</p>
+                  <Button size="sm" variant="outline" onClick={() => dreHistory.refetch()}>Tentar novamente</Button>
+                </div>
+              )}
               <Button size="sm" onClick={handleExportDRE} disabled={!!periodError || dreHistory.isLoading || dreHistory.isFetching || dreHistory.isError || isExportingDRE} className="gap-1.5">
                 {isExportingDRE ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
                 {isExportingDRE ? "Gerando PDF..." : dreHistory.isFetching ? "Carregando histórico..." : "Exportar PDF"}
               </Button>
             </div>
 
+            {!displayedReady ? (
+              <div className="space-y-2 text-sm text-muted-foreground">
+                {displayedHistory.isError ? "Falha ao carregar a DRE do mês exibido." : "Carregando DRE do mês exibido..."}
+                {displayedHistory.isError && <Button size="sm" variant="outline" onClick={() => displayedHistory.refetch()}>Tentar novamente</Button>}
+              </div>
+            ) : (
             <div>
               <div className="mb-4 space-y-1">
                 <h2 className="text-lg font-semibold">DRE — {monthLabel}</h2>
@@ -766,6 +783,7 @@ export function AdvancedFinancialSheet({
                 {dre.isProjectedTax && ' A DRE exibida está em modo projeção; o PDF exporta apenas registros históricos. Impostos projetados usam a taxa histórica do mês anterior.'}
               </p>
             </div>
+            )}
           </TabsContent>
         </Tabs>
       </SheetContent>
