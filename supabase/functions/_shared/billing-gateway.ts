@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import {
   createConexaCharge,
   getConexaCharge,
@@ -46,6 +46,9 @@ export interface BillingPayment {
   conexa_invoice_url?: string | null;
   conexa_charge_url?: string | null;
   conexa_billet_url?: string | null;
+  conexa_pix_copy_paste?: string | null;
+  conexa_pix_qr_code?: string | null;
+  conexa_raw_charge?: unknown;
   stripe_checkout_session_id?: string | null;
 }
 
@@ -372,7 +375,7 @@ async function generateAsaasCharge(
   };
 }
 
-async function generateConexaCharge(
+export async function generateConexaCharge(
   adminClient: SupabaseClient,
   payment: BillingPayment,
   client: BillingClient,
@@ -542,20 +545,27 @@ async function generateConexaCharge(
     clientId: client.id,
   });
 
-  const updates = {
+  const updates: Record<string, unknown> = {
     conexa_sale_id: saleId,
     conexa_charge_id: chargeId,
-    conexa_charge_url: details.chargeUrl,
-    conexa_invoice_url: details.chargeUrl,
-    conexa_billet_url: details.billetUrl,
-    conexa_pix_copy_paste: pix?.copyPasteCode ?? null,
-    conexa_pix_qr_code: pix?.qrCode ?? null,
-    conexa_raw_charge: details.raw ?? chargeCreateRaw,
-    conexa_billing_status: details.billetUrl
+    conexa_billing_status: details.billetUrl || payment.conexa_billet_url
       ? "billet_available"
-      : "charge_created",
+      : "charge_created_without_billet",
     conexa_last_sync_at: new Date().toISOString(),
   };
+
+  if (details.chargeUrl) {
+    updates.conexa_charge_url = details.chargeUrl;
+    updates.conexa_invoice_url = details.chargeUrl;
+  }
+  if (details.billetUrl) updates.conexa_billet_url = details.billetUrl;
+  if (pix?.copyPasteCode) {
+    updates.conexa_pix_copy_paste = pix.copyPasteCode;
+  }
+  if (pix?.qrCode) updates.conexa_pix_qr_code = pix.qrCode;
+  if (details.raw ?? chargeCreateRaw) {
+    updates.conexa_raw_charge = details.raw ?? chargeCreateRaw;
+  }
 
   await persistPaymentUpdates(adminClient, payment.id, updates);
 

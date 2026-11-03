@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
 
 interface CreatePaymentData {
+  payment_id?: string;
   client_id: string;
   amount: number;
   due_date: string;
@@ -12,6 +13,33 @@ interface CreatePaymentData {
   status?: "pending" | "paid" | "overdue";
   paid_date?: string | null;
   auto_invoice?: boolean;
+}
+
+async function functionErrorMessage(error: unknown): Promise<string> {
+  const fallback = error instanceof Error
+    ? error.message
+    : "Não foi possível concluir a cobrança.";
+  const context = (error as { context?: Response } | null)?.context;
+  if (!context || typeof context.clone !== "function") return fallback;
+
+  try {
+    const payload = await context.clone().json() as {
+      error?: string;
+      message?: string;
+      recoverable?: boolean;
+      external_state?: string;
+    };
+    const message = payload.error || payload.message || fallback;
+    if (payload.recoverable && payload.external_state === "charge_created") {
+      return `${message} A cobrança externa já existe e esta mesma tentativa será recuperada; não crie outra cobrança.`;
+    }
+    if (payload.recoverable && payload.external_state === "sale_created") {
+      return `${message} A venda externa já foi salva e esta mesma tentativa pode ser retomada sem criar outra venda.`;
+    }
+    return message;
+  } catch {
+    return fallback;
+  }
 }
 
 interface UpdatePaymentData extends CreatePaymentData {
@@ -57,6 +85,7 @@ export function useCreatePayment() {
       }
 
       const payload: Record<string, unknown> = {
+        payment_id: data.payment_id,
         client_id: data.client_id,
         amount: data.amount,
         due_date: data.due_date,
@@ -76,10 +105,13 @@ export function useCreatePayment() {
         { body: payload }
       );
 
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(await functionErrorMessage(error));
       if (result?.error) throw new Error(result.error);
 
-      toast({ title: "Fatura criada", description: "Cobrança gerada com sucesso!" });
+      toast({
+        title: result?.billing_pending ? "Cobrança criada; boleto pendente" : "Fatura criada",
+        description: result?.message || "Cobrança gerada com sucesso!",
+      });
       return result.payment;
     } catch (error: any) {
       toast({ title: "Erro ao criar fatura", description: error.message, variant: "destructive" });

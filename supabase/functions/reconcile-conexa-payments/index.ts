@@ -10,6 +10,11 @@ import {
   logConexaWebhook,
   parseConexaPayload,
 } from "../_shared/conexa-payment-update.ts";
+import {
+  getConexaCharge,
+  getConexaPix,
+  type ConexaCreds,
+} from "../_shared/conexa-client.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -19,17 +24,6 @@ const supabase = createClient(
 const PAYMENT_LOOKBACK_DAYS = 60;
 const PAYMENT_LOOKAHEAD_DAYS = 7;
 const MAX_PAYMENTS_PER_AGENCY = 200;
-const FETCH_TIMEOUT_MS = 12_000;
-
-async function fetchWithTimeout(url: string, init: RequestInit, ms: number) {
-  const ctrl = new AbortController();
-  const id = setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await fetch(url, { ...init, signal: ctrl.signal });
-  } finally {
-    clearTimeout(id);
-  }
-}
 
 interface AgencySettings {
   agency_id: string;
@@ -51,7 +45,10 @@ async function reconcileAgency(s: AgencySettings) {
     return { ...summary, skipped: "missing_credentials" as const };
   }
 
-  const baseUrl = `https://${s.conexa_subdomain}.conexa.app/index.php/api/v2`;
+  const conexaCreds: ConexaCreds = {
+    baseUrl: `https://${s.conexa_subdomain}.conexa.app/index.php/api/v2`,
+    apiKey: s.conexa_api_key,
+  };
 
   const today = new Date();
   const from = new Date(today.getTime() - PAYMENT_LOOKBACK_DAYS * 86400000);
@@ -59,7 +56,7 @@ async function reconcileAgency(s: AgencySettings) {
 
   const { data: payments, error } = await supabase
     .from("client_payments")
-    .select("id, conexa_charge_id, conexa_pix_copy_paste, due_date, agency_id, status")
+    .select("id, client_id, conexa_charge_id, conexa_charge_url, conexa_invoice_url, conexa_billet_url, conexa_pix_copy_paste, conexa_pix_qr_code, due_date, agency_id, status")
     .eq("agency_id", s.agency_id)
     .eq("billing_type", "conexa")
     .eq("status", "pending")
@@ -81,61 +78,55 @@ async function reconcileAgency(s: AgencySettings) {
   for (const p of payments) {
     summary.checked += 1;
     try {
-      const res = await fetchWithTimeout(
-        `${baseUrl}/charge/${p.conexa_charge_id}`,
+      const detail = await getConexaCharge(
+        supabase,
+        conexaCreds,
+        String(p.conexa_charge_id),
         {
-          method: "GET",
-          headers: { Authorization: `Bearer ${s.conexa_api_key}` },
-        },
-        FETCH_TIMEOUT_MS,
-      );
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        await logConexaWebhook(supabase, {
           agencyId: s.agency_id,
           paymentId: p.id,
-          source: "reconcile_cron",
-          rawBody: { http_status: res.status, body: text.slice(0, 1000) },
-          parsedChargeId: p.conexa_charge_id,
-          matchStatus: "cron_api_error",
-          errorMessage: `HTTP ${res.status}`,
-        });
+          clientId: p.client_id,
+          operation: "charge_reconcile_fetch",
+        },
+      );
+
+      if (!detail.raw) {
         summary.api_errors += 1;
         continue;
       }
 
-      const detail = await res.json();
-
       // Enriquecer cobrança: atualizar URLs/raw/last_sync_at independentemente do status
       try {
         const enrich: Record<string, unknown> = {
-          conexa_raw_charge: detail,
+          conexa_raw_charge: detail.raw,
           conexa_last_sync_at: new Date().toISOString(),
+          conexa_billing_status: detail.billetUrl || p.conexa_billet_url
+            ? "billet_available"
+            : "charge_created_without_billet",
         };
-        if (detail?.chargeUrl) {
+        if (detail.chargeUrl) {
           enrich.conexa_charge_url = detail.chargeUrl;
           enrich.conexa_invoice_url = detail.chargeUrl;
         }
-        if (detail?.billetUrl) enrich.conexa_billet_url = detail.billetUrl;
+        if (detail.billetUrl) enrich.conexa_billet_url = detail.billetUrl;
 
-        // Tentar Pix apenas se ainda não temos copy/paste salvo
-        if (!(p as any).conexa_pix_copy_paste) {
-          try {
-            const pixRes = await fetchWithTimeout(
-              `${baseUrl}/charge/pix/${p.conexa_charge_id}`,
-              { method: "GET", headers: { Authorization: `Bearer ${s.conexa_api_key}` } },
-              FETCH_TIMEOUT_MS,
-            );
-            if (pixRes.ok) {
-              const pixData = await pixRes.json();
-              if (pixData?.copyPasteCode) enrich.conexa_pix_copy_paste = pixData.copyPasteCode;
-              if (pixData?.qrCode) enrich.conexa_pix_qr_code = pixData.qrCode;
-            } else {
-              await pixRes.text().catch(() => "");
-            }
-          } catch (_pixErr) {
-            // Pix opcional — silenciar
+        // Pix é opcional e só complementa campos ausentes; nunca apaga valores bons.
+        if (!p.conexa_pix_copy_paste || !p.conexa_pix_qr_code) {
+          const pix = await getConexaPix(
+            supabase,
+            conexaCreds,
+            String(p.conexa_charge_id),
+            {
+              agencyId: s.agency_id,
+              paymentId: p.id,
+              clientId: p.client_id,
+            },
+          );
+          if (!p.conexa_pix_copy_paste && pix?.copyPasteCode) {
+            enrich.conexa_pix_copy_paste = pix.copyPasteCode;
+          }
+          if (!p.conexa_pix_qr_code && pix?.qrCode) {
+            enrich.conexa_pix_qr_code = pix.qrCode;
           }
         }
 
@@ -144,7 +135,7 @@ async function reconcileAgency(s: AgencySettings) {
         console.warn(`[reconcile-conexa] enrich failed for ${p.id}:`, (enrichErr as Error).message);
       }
 
-      const parsed = parseConexaPayload(detail);
+      const parsed = parseConexaPayload(detail.raw);
 
       if (parsed.kind !== "settled" && parsed.kind !== "cancelled") {
         // Cobrança ainda pendente na Conexa — registra mesmo assim para auditoria
@@ -152,7 +143,7 @@ async function reconcileAgency(s: AgencySettings) {
           agencyId: s.agency_id,
           paymentId: p.id,
           source: "reconcile_cron",
-          rawBody: detail,
+          rawBody: detail.raw,
           parsedChargeId: parsed.kind === "unknown_event" ? parsed.chargeId : null,
           parsedEvent: parsed.kind,
           matchStatus: "cron_no_change",
@@ -169,7 +160,7 @@ async function reconcileAgency(s: AgencySettings) {
         agencyId: s.agency_id,
         paymentId: result.paymentId ?? p.id,
         source: "reconcile_cron",
-        rawBody: detail,
+        rawBody: detail.raw,
         parsedChargeId: parsed.chargeId,
         parsedEvent: parsed.kind,
         matchStatus:
