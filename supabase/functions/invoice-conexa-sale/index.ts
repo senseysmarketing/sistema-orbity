@@ -169,6 +169,7 @@ Deno.serve(async (req) => {
           dueDate: payment.due_date,
           notes: payment.description,
           invoicingMethodId: autoBillet ? settings.conexa_invoicing_method_id : null,
+          generateBillet: autoBillet,
         },
         { agencyId: payment.agency_id, paymentId: payment.id, clientId: payment.client_id },
       );
