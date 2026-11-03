@@ -97,6 +97,18 @@ function stripSecrets(node: any): void {
       node[k] = "***";
       continue;
     }
+    if (
+      lower === "qrcode" ||
+      lower === "qr_code" ||
+      lower === "qrcodeimage" ||
+      lower === "copypastecode" ||
+      lower === "copy_paste_code" ||
+      lower === "pixcopypaste"
+    ) {
+      const length = typeof node[k] === "string" ? node[k].length : 0;
+      node[k] = `[redacted${length ? `:${length}` : ""}]`;
+      continue;
+    }
     if (typeof node[k] === "object") stripSecrets(node[k]);
   }
 }
@@ -325,13 +337,55 @@ export async function getConexaCharge(
     return { chargeId, chargeUrl: null, billetUrl: null, status: null, raw: null };
   }
 
-  const d = res.data;
+  return normalizeConexaChargeResponse(chargeId, res.data);
+}
+
+export function normalizeConexaChargeResponse(
+  chargeId: string,
+  payload: unknown,
+): ChargeDetails {
+  const d = payload && typeof payload === "object"
+    ? payload as Record<string, any>
+    : {};
+  const billet = d.billet && typeof d.billet === "object"
+    ? d.billet as Record<string, any>
+    : {};
+
   return {
     chargeId,
     chargeUrl: d.chargeUrl ?? d.charge_url ?? null,
-    billetUrl: d.billetUrl ?? d.billet_url ?? null,
-    status: d.status ?? null,
-    raw: d,
+    billetUrl:
+      d.billetUrl ??
+      d.billet_url ??
+      billet.url ??
+      billet.billetUrl ??
+      billet.billet_url ??
+      null,
+    status: billet.status ?? d.status ?? null,
+    raw: payload,
+  };
+}
+
+export function normalizeConexaPixResponse(payload: unknown): PixDetails | null {
+  const candidate = Array.isArray(payload) ? payload[0] : payload;
+  if (!candidate || typeof candidate !== "object") return null;
+
+  const d = candidate as Record<string, unknown>;
+  const copyPasteCode =
+    d.copyPasteCode ?? d.copy_paste_code ?? d.pixCopyPaste ?? null;
+  const qrCode = d.qrCode ?? d.qr_code ?? d.qrCodeImage ?? null;
+  const normalizedCopyPaste = typeof copyPasteCode === "string" && copyPasteCode.trim()
+    ? copyPasteCode
+    : null;
+  const normalizedQrCode = typeof qrCode === "string" && qrCode.trim()
+    ? qrCode
+    : null;
+
+  if (!normalizedCopyPaste && !normalizedQrCode) return null;
+  return {
+    copyPasteCode: normalizedCopyPaste,
+    qrCode: normalizedQrCode,
+    raw: payload,
   };
 }
 
@@ -358,10 +412,5 @@ export async function getConexaPix(
   });
 
   if (!res.ok || !res.data) return null;
-  const d = res.data;
-  return {
-    copyPasteCode: d.copyPasteCode ?? d.copy_paste_code ?? d.pixCopyPaste ?? null,
-    qrCode: d.qrCode ?? d.qr_code ?? d.qrCodeImage ?? null,
-    raw: d,
-  };
+  return normalizeConexaPixResponse(res.data);
 }

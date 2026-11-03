@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import {
   createConexaCharge as sharedCreateConexaCharge,
   getConexaCharge,
@@ -18,12 +18,70 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY =
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const MANUAL_LOCK_STALE_MS = 5 * 60 * 1000;
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+async function persistLockedPayment(
+  adminClient: any,
+  paymentId: string,
+  lockToken: string,
+  updates: Record<string, unknown>,
+) {
+  const { data, error } = await adminClient
+    .from("client_payments")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", paymentId)
+    .eq("generation_locked_by", lockToken)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error(
+      error?.message || "A trava desta emissão foi perdida; recarregue a cobrança antes de continuar.",
+    );
+  }
+}
+
+async function acquireManualPaymentLock(
+  adminClient: any,
+  payment: any,
+  lockToken: string,
+) {
+  const lockedAt = payment.generation_locked_at
+    ? new Date(payment.generation_locked_at).getTime()
+    : null;
+  const stale = lockedAt !== null &&
+    lockedAt < Date.now() - MANUAL_LOCK_STALE_MS;
+
+  let query = adminClient
+    .from("client_payments")
+    .update({
+      generation_status: "processing",
+      generation_locked_at: new Date().toISOString(),
+      generation_locked_by: lockToken,
+      generation_last_attempt_at: new Date().toISOString(),
+      generation_attempts: Number(payment.generation_attempts ?? 0) + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", payment.id);
+
+  if (!payment.generation_locked_at) {
+    query = query.is("generation_locked_at", null);
+  } else if (stale) {
+    query = query.eq("generation_locked_by", payment.generation_locked_by);
+  } else {
+    return null;
+  }
+
+  const { data, error } = await query.select("*").maybeSingle();
+  if (error) throw new Error(`Falha ao reservar emissão: ${error.message}`);
+  return data;
 }
 
 // --------------- Asaas helpers ---------------
@@ -321,13 +379,26 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    const userId = String(claimsData.claims.sub ?? "");
+    const { data: agencyMembership, error: membershipError } = await userClient
+      .from("agency_users")
+      .select("agency_id")
+      .eq("agency_id", agency_id)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (membershipError || !agencyMembership) {
+      return jsonResponse({ error: "Agency access denied" }, 403);
+    }
+
     // 3. Fetch client data (user-scoped for RLS)
     const { data: client, error: clientError } = await userClient
       .from("clients")
       .select(
-        "id, name, legal_name, email, document, contact, asaas_customer_id, conexa_customer_id, zip_code, street, number, neighborhood, city, state, complement",
+        "id, agency_id, name, legal_name, email, document, contact, asaas_customer_id, conexa_customer_id, zip_code, street, number, neighborhood, city, state, complement",
       )
       .eq("id", client_id)
+      .eq("agency_id", agency_id)
       .single();
 
     if (clientError || !client) {
@@ -340,13 +411,28 @@ Deno.serve(async (req) => {
     const clientForGateway = { ...client, name: formalClientName };
 
     const effectiveBillingType = billing_type || "manual";
+    const requestedPaymentId = payment_id ||
+      (effectiveBillingType === "conexa" ? crypto.randomUUID() : null);
 
     let existingPayment: any = null;
-    if (payment_id) {
+    if (requestedPaymentId) {
       const { data, error: existingPaymentError } = await adminClient
         .from("client_payments")
         .select(
           `
+          id,
+          client_id,
+          agency_id,
+          amount,
+          due_date,
+          description,
+          billing_type,
+          status,
+          paid_date,
+          generation_status,
+          generation_attempts,
+          generation_locked_at,
+          generation_locked_by,
           asaas_payment_id,
           invoice_url,
           pix_copy_paste,
@@ -362,7 +448,7 @@ Deno.serve(async (req) => {
           conexa_last_sync_at
         `,
         )
-        .eq("id", payment_id)
+        .eq("id", requestedPaymentId)
         .eq("agency_id", agency_id)
         .maybeSingle();
 
@@ -376,6 +462,34 @@ Deno.serve(async (req) => {
         );
       }
       existingPayment = data;
+
+      if (
+        existingPayment &&
+        (existingPayment.client_id !== client_id ||
+          existingPayment.agency_id !== agency_id ||
+          existingPayment.billing_type !== effectiveBillingType)
+      ) {
+        return jsonResponse(
+          { error: "O identificador informado pertence a outra intenção de cobrança." },
+          409,
+        );
+      }
+
+      if (
+        existingPayment &&
+        (Number(existingPayment.amount) !== Number(amount) ||
+          existingPayment.due_date !== due_date)
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "Esta cobrança já foi iniciada com outro valor ou vencimento. Abra o registro existente em vez de criar uma nova emissão.",
+            payment_id: existingPayment.id,
+            recoverable: true,
+          },
+          409,
+        );
+      }
     }
 
     // Variables to populate from gateway responses
@@ -402,6 +516,8 @@ Deno.serve(async (req) => {
     let conexa_last_sync_at: string | null =
       existingPayment?.conexa_last_sync_at ?? null;
     let gateway_fee: number | null = null;
+    let manualLockToken: string | null = null;
+    let uncertainExternalOperation = false;
 
     // 4. Gateway routing
     if (effectiveBillingType === "asaas" || effectiveBillingType === "conexa") {
@@ -525,7 +641,112 @@ Deno.serve(async (req) => {
           }
         }
 
-        let saleId = conexa_sale_id;
+        manualLockToken = `manual:${crypto.randomUUID()}`;
+
+        if (!existingPayment) {
+          const now = new Date().toISOString();
+          const { data: insertedPayment, error: insertIntentError } = await adminClient
+            .from("client_payments")
+            .insert({
+              id: requestedPaymentId,
+              client_id,
+              amount,
+              due_date,
+              description: description || null,
+              billing_type: effectiveBillingType,
+              status: status || "pending",
+              paid_date: paid_date || null,
+              agency_id,
+              source: "manual",
+              generation_status: "processing",
+              generation_attempts: 1,
+              generation_last_attempt_at: now,
+              generation_locked_at: now,
+              generation_locked_by: manualLockToken,
+            })
+            .select("*")
+            .maybeSingle();
+
+          if (insertIntentError || !insertedPayment) {
+            if (insertIntentError?.code !== "23505") {
+              return jsonResponse(
+                {
+                  error: "Não foi possível registrar a intenção de cobrança.",
+                  details: insertIntentError?.message,
+                },
+                500,
+              );
+            }
+
+            const { data: concurrentPayment, error: concurrentPaymentError } =
+              await adminClient
+                .from("client_payments")
+                .select("*")
+                .eq("id", requestedPaymentId)
+                .eq("agency_id", agency_id)
+                .maybeSingle();
+            if (concurrentPaymentError || !concurrentPayment) {
+              return jsonResponse(
+                { error: "Não foi possível recuperar a intenção já registrada." },
+                409,
+              );
+            }
+            if (
+              concurrentPayment.client_id !== client_id ||
+              concurrentPayment.agency_id !== agency_id ||
+              concurrentPayment.billing_type !== effectiveBillingType ||
+              Number(concurrentPayment.amount) !== Number(amount) ||
+              concurrentPayment.due_date !== due_date
+            ) {
+              return jsonResponse(
+                { error: "O identificador informado pertence a outra intenção de cobrança." },
+                409,
+              );
+            }
+            existingPayment = concurrentPayment;
+          } else {
+            existingPayment = insertedPayment;
+          }
+        }
+
+        if (existingPayment.generation_locked_by !== manualLockToken) {
+          if (existingPayment.generation_last_error?.startsWith("external_result_unknown:")) {
+            return jsonResponse({
+              error: "O resultado da emissão anterior no Conexa é incerto. Confira a venda ou cobrança no Conexa e vincule o ID após auditoria antes de continuar.",
+              payment_id: requestedPaymentId,
+              recoverable: false,
+            }, 409);
+          }
+          const lockedPayment = await acquireManualPaymentLock(
+            adminClient,
+            existingPayment,
+            manualLockToken,
+          );
+          if (!lockedPayment) {
+            return jsonResponse(
+              {
+                error:
+                  "Esta cobrança já está sendo emitida. Aguarde a conclusão antes de tentar novamente.",
+                payment_id: requestedPaymentId,
+                recoverable: true,
+              },
+              409,
+            );
+          }
+          existingPayment = lockedPayment;
+          conexa_sale_id = lockedPayment.conexa_sale_id ?? conexa_sale_id;
+          conexa_charge_id = lockedPayment.conexa_charge_id ?? conexa_charge_id;
+          conexa_charge_url = lockedPayment.conexa_charge_url ?? conexa_charge_url;
+          conexa_invoice_url = lockedPayment.conexa_invoice_url ?? conexa_invoice_url;
+          conexa_billet_url = lockedPayment.conexa_billet_url ?? conexa_billet_url;
+          conexa_pix_copy_paste = lockedPayment.conexa_pix_copy_paste ?? conexa_pix_copy_paste;
+          conexa_pix_qr_code = lockedPayment.conexa_pix_qr_code ?? conexa_pix_qr_code;
+          conexa_raw_charge = lockedPayment.conexa_raw_charge ?? conexa_raw_charge;
+          conexa_billing_status = lockedPayment.conexa_billing_status ?? conexa_billing_status;
+        }
+
+        try {
+          let saleId = conexa_sale_id;
 
         if (!saleId) {
           // Ensure customer exists in Conexa (uses unit_id as companyId)
@@ -541,6 +762,7 @@ Deno.serve(async (req) => {
           // Create sale in Conexa (flat payload, no companyId)
           let conexaResponse;
           try {
+            uncertainExternalOperation = true;
             conexaResponse = await createConexaSale(
               conexaCustomerId,
               amount,
@@ -553,6 +775,7 @@ Deno.serve(async (req) => {
           } catch (saleError: any) {
             // If customer doesn't exist in Conexa anymore, clear stale ID and retry
             if (saleError.message?.includes("Customer does not exist")) {
+              uncertainExternalOperation = false;
               console.warn(
                 "[Conexa] Stale customer ID detected, re-creating customer...",
               );
@@ -570,6 +793,7 @@ Deno.serve(async (req) => {
                 settings.conexa_unit_id,
               );
 
+              uncertainExternalOperation = true;
               conexaResponse = await createConexaSale(
                 conexaCustomerId,
                 amount,
@@ -599,13 +823,28 @@ Deno.serve(async (req) => {
           if (saleId) {
             conexa_sale_id = saleId;
             conexa_billing_status = "sale_created";
+            await persistLockedPayment(
+              adminClient,
+              requestedPaymentId,
+              manualLockToken,
+              {
+                conexa_sale_id,
+                conexa_billing_status,
+              },
+            );
+            uncertainExternalOperation = false;
           }
+        }
+
+        if (!saleId) {
+          throw new Error("O Conexa criou a venda sem retornar um identificador utilizável.");
         }
 
         if (saleId && shouldAutoInvoice) {
           // Criar cobrança via /charge — com invoicingMethodId se auto-boleto ativo
           let chargeCreateRaw: unknown = null;
           if (!conexa_charge_id) {
+            uncertainExternalOperation = true;
             const createdCharge = await sharedCreateConexaCharge(
               adminClient,
               conexaCreds,
@@ -622,6 +861,17 @@ Deno.serve(async (req) => {
             conexa_charge_id = createdCharge.chargeId;
             chargeCreateRaw = createdCharge.raw;
             conexa_billing_status = "charge_created";
+            await persistLockedPayment(
+              adminClient,
+              requestedPaymentId,
+              manualLockToken,
+              {
+                conexa_charge_id,
+                conexa_raw_charge: chargeCreateRaw,
+                conexa_billing_status,
+              },
+            );
+            uncertainExternalOperation = false;
           } else {
             console.log(
               `[Gateway] Reusing existing Conexa charge ${conexa_charge_id}`,
@@ -644,21 +894,21 @@ Deno.serve(async (req) => {
               clientId: client_id,
             },
           );
-          conexa_charge_url = details.chargeUrl;
-          conexa_invoice_url = details.chargeUrl; // legado
-          conexa_billet_url = details.billetUrl;
-          conexa_raw_charge = details.raw ?? chargeCreateRaw;
+          if (details.chargeUrl) {
+            conexa_charge_url = details.chargeUrl;
+            conexa_invoice_url = details.chargeUrl; // legado
+          }
+          if (details.billetUrl) conexa_billet_url = details.billetUrl;
+          if (details.raw ?? chargeCreateRaw) {
+            conexa_raw_charge = details.raw ?? chargeCreateRaw;
+          }
 
-          if (details.billetUrl) {
+          if (conexa_billet_url) {
             conexa_billing_status = "billet_available";
           } else if (autoBillet) {
             conexa_billing_status = "charge_created_without_billet";
-            return jsonResponse(
-              {
-                error: `Conexa criou a cobrança ${conexa_charge_id}, mas o boleto Efí não foi gerado. Isso geralmente acontece quando o Meio de Faturamento selecionado não está corretamente vinculado ao Efí no painel do Conexa, ou quando o ID do Meio de Faturamento está ausente. Vá em Configurações → Integrações → Conexa, clique em 'Buscar meios de faturamento' e selecione novamente o meio Boleto Efí antes de salvar.`,
-              },
-              422,
-            );
+          } else if (!conexa_billing_status) {
+            conexa_billing_status = "charge_created";
           }
 
           // Pix opcional
@@ -672,11 +922,47 @@ Deno.serve(async (req) => {
             },
           );
           if (pix) {
-            conexa_pix_copy_paste = pix.copyPasteCode;
-            conexa_pix_qr_code = pix.qrCode;
+            if (pix.copyPasteCode) {
+              conexa_pix_copy_paste = pix.copyPasteCode;
+            }
+            if (pix.qrCode) conexa_pix_qr_code = pix.qrCode;
           }
 
           conexa_last_sync_at = new Date().toISOString();
+        }
+        } catch (conexaError) {
+          const message = conexaError instanceof Error
+            ? conexaError.message
+            : "Falha ao emitir cobrança no Conexa.";
+          await adminClient
+            .from("client_payments")
+            .update({
+              generation_status: "failed",
+              generation_last_error: uncertainExternalOperation
+                ? `external_result_unknown:${message}`
+                : message,
+              generation_locked_at: null,
+              generation_locked_by: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", requestedPaymentId)
+            .eq("generation_locked_by", manualLockToken);
+
+          return jsonResponse(
+            {
+              error: uncertainExternalOperation
+                ? "O resultado da chamada ao Conexa é incerto. Verifique no painel do Conexa antes de retomar esta cobrança."
+                : message,
+              payment_id: requestedPaymentId,
+              recoverable: !uncertainExternalOperation,
+              external_state: conexa_charge_id
+                ? "charge_created"
+                : conexa_sale_id
+                ? "sale_created"
+                : "intent_saved",
+            },
+            502,
+          );
         }
       }
     }
@@ -723,14 +1009,19 @@ Deno.serve(async (req) => {
     };
 
     let result;
-    if (payment_id) {
-      console.log(`[Gateway] Updating existing payment: ${payment_id}`);
-      result = await adminClient
+    const paymentIdToUpdate = effectiveBillingType === "conexa"
+      ? requestedPaymentId
+      : payment_id;
+    if (paymentIdToUpdate) {
+      console.log(`[Gateway] Updating existing payment: ${paymentIdToUpdate}`);
+      let updateQuery = adminClient
         .from("client_payments")
         .update(finalPayload)
-        .eq("id", payment_id)
-        .select()
-        .single();
+        .eq("id", paymentIdToUpdate);
+      if (effectiveBillingType === "conexa" && manualLockToken) {
+        updateQuery = updateQuery.eq("generation_locked_by", manualLockToken);
+      }
+      result = await updateQuery.select().single();
     } else {
       console.log("[Gateway] Inserting new payment");
       result = await adminClient
@@ -745,12 +1036,26 @@ Deno.serve(async (req) => {
     if (dbError) {
       console.error("DB error:", dbError);
       return jsonResponse(
-        { error: "Failed to save payment", details: dbError.message },
+        {
+          error: "Failed to save payment",
+          details: dbError.message,
+          payment_id: paymentIdToUpdate,
+          recoverable: effectiveBillingType === "conexa",
+        },
         500,
       );
     }
 
-    return jsonResponse({ success: true, payment });
+    const billetPending = effectiveBillingType === "conexa" &&
+      conexa_billing_status === "charge_created_without_billet";
+    return jsonResponse({
+      success: true,
+      payment,
+      billing_pending: billetPending,
+      message: billetPending
+        ? "A cobrança foi criada no Conexa e vinculada ao Orbity, mas o boleto ainda está pendente no Efí. O Orbity consultará esta mesma cobrança novamente, sem reemiti-la."
+        : null,
+    });
   } catch (err: unknown) {
     console.error("Unhandled error:", err);
     const message =

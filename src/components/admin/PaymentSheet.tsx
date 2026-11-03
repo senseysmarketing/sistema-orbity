@@ -43,7 +43,11 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const { toast } = useToast();
   const { currentAgency } = useAgency(); // kept for cancel/contract flows
   const { enabledGateways } = usePaymentGateway();
-  const { createPayment: createPaymentHook, updatePayment: updatePaymentHook } = useCreatePayment();
+  const {
+    createPayment: createPaymentHook,
+    updatePayment: updatePaymentHook,
+    loading: gatewayLoading,
+  } = useCreatePayment();
   const [loading, setLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [manualOverrideDialogOpen, setManualOverrideDialogOpen] = useState(false);
@@ -63,6 +67,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const [description, setDescription] = useState("");
   const [billingType, setBillingType] = useState("manual");
   const [autoInvoice, setAutoInvoice] = useState(true);
+  const [draftPaymentId, setDraftPaymentId] = useState<string | null>(null);
   const totalAmount = useMemo(() => {
     return Math.max(0, baseValue + additions - discounts);
   }, [baseValue, additions, discounts]);
@@ -74,7 +79,13 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   }, [preselectedClient, clientId, clients]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setDraftPaymentId(null);
+      return;
+    }
+    if (!payment && !draftPaymentId) {
+      setDraftPaymentId(crypto.randomUUID());
+    }
 
     if (payment) {
       const client = clients.find(c => c.id === payment.client_id);
@@ -118,7 +129,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
     setUpdateContract(false);
     // setDeactivateClient removido — desativação centralizada no ClientOffboardingDialog
     setManualOverrideConfirmed(false);
-  }, [open, payment, preselectedClient, clients, enabledGateways]);
+  }, [open, payment, preselectedClient, clients, enabledGateways, draftPaymentId]);
 
   const handleClientChange = (id: string) => {
     setClientId(id);
@@ -132,13 +143,20 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || gatewayLoading) return;
     if (!clientId || !dueDate) {
       toast({ title: "Preencha os campos obrigatórios", variant: "destructive" });
       return;
     }
     setLoading(true);
     try {
-      if (payment) {
+      const recoverExistingConexa = payment?.billing_type === "conexa" &&
+        !!payment?.conexa_sale_id &&
+        (!payment?.conexa_charge_id ||
+          payment?.generation_status === "failed" ||
+          payment?.conexa_billing_status === "charge_created_without_billet");
+
+      if (payment && !recoverExistingConexa) {
         const success = await updatePaymentHook({
           id: payment.id,
           client_id: clientId,
@@ -152,6 +170,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
         if (!success) { setLoading(false); return; }
       } else {
         const result = await createPaymentHook({
+          payment_id: payment?.id || draftPaymentId || crypto.randomUUID(),
           client_id: clientId,
           amount: totalAmount,
           due_date: dueDate,
@@ -408,7 +427,17 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                 <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
                   <AlertDescription className="text-amber-700 dark:text-amber-300 text-xs">
-                    Aviso: Alterar o valor ou vencimento atualizará automaticamente o boleto no seu gateway de pagamento ({hasAsaasCharge ? 'Asaas' : 'Conexa'}).
+                    {hasConexaCharge
+                      ? "Esta cobrança já existe no Conexa. Confira valor e vencimento no Conexa antes de alterar este registro; salvar aqui não reemite o boleto."
+                      : "Aviso: Alterar o valor ou vencimento atualizará automaticamente o boleto no Asaas."}
+                  </AlertDescription>
+                </Alert>
+              )}
+              {isEditing && billingType === 'conexa' && payment?.conexa_billing_status === 'charge_created_without_billet' && (
+                <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-700 dark:text-amber-300 text-xs">
+                    Cobrança Conexa {payment.conexa_charge_id} criada; boleto Efí pendente. O Orbity consultará a mesma cobrança para completar boleto e Pix. Não crie outra fatura para esta tentativa.
                   </AlertDescription>
                 </Alert>
               )}
@@ -762,9 +791,9 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
               {/* Actions */}
               <div className="flex flex-col gap-2 pt-4 border-t">
                 <div className="flex gap-2">
-                  <Button type="submit" disabled={loading} className="flex-1">
+                  <Button type="submit" disabled={loading || gatewayLoading} className="flex-1">
                     <Save className="h-4 w-4 mr-1" />
-                    {loading ? "Salvando..." : "Salvar"}
+                    {loading || gatewayLoading ? "Salvando..." : "Salvar"}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                     <X className="h-4 w-4" />
