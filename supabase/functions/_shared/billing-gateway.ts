@@ -512,6 +512,7 @@ export async function generateConexaCharge(
         invoicingMethodId: autoBillet
           ? Number(settings.conexa_invoicing_method_id)
           : null,
+        generateBillet: autoBillet,
       },
       {
         agencyId: payment.agency_id,

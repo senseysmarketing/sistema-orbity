@@ -267,6 +267,7 @@ export interface CreateChargeInput {
   dueDate: string;
   notes?: string | null;
   invoicingMethodId?: number | null;
+  generateBillet?: boolean;
 }
 
 export async function createConexaCharge(
@@ -281,6 +282,7 @@ export async function createConexaCharge(
   };
   if (input.notes) body.notes = input.notes;
   if (input.invoicingMethodId) body.invoicingMethodId = input.invoicingMethodId;
+  if (input.generateBillet === true) body.generateBillet = true;
 
   console.log("[Conexa] POST /charge body:", JSON.stringify(body));
 

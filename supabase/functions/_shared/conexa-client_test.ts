@@ -1,5 +1,6 @@
 // Deno unit tests; the _test.ts suffix keeps them outside the Vitest suite.
 import {
+  createConexaCharge,
   normalizeConexaChargeResponse,
   normalizeConexaPixResponse,
 } from "./conexa-client.ts";
@@ -56,6 +57,33 @@ const settings = {
   conexa_unit_id: 1,
   conexa_auto_generate_billet: false,
 };
+
+Deno.test("POST /charge envia generateBillet apenas quando solicitado", async () => {
+  const originalFetch = globalThis.fetch;
+  const bodies: Record<string, unknown>[] = [];
+  globalThis.fetch = (_input: string | URL | Request, init?: RequestInit) => {
+    bodies.push(JSON.parse(String(init?.body)));
+    return Promise.resolve(Response.json({ id: 201 }));
+  };
+  try {
+    const db = fakeSupabase();
+    const creds = { baseUrl: "https://example.conexa.app/index.php/api/v2", apiKey: "test" };
+    const ctx = { agencyId: basePayment.agency_id };
+    await createConexaCharge(db.client as never, creds, {
+      saleId: 101, dueDate: basePayment.due_date,
+      invoicingMethodId: 3, generateBillet: true,
+    }, ctx);
+    await createConexaCharge(db.client as never, creds, {
+      saleId: 102, dueDate: basePayment.due_date,
+      generateBillet: false,
+    }, ctx);
+    assert(bodies[0].invoicingMethodId === 3, "Meio de faturamento ausente");
+    assert(bodies[0].generateBillet === true, "Flag do boleto ausente");
+    assert(!("generateBillet" in bodies[1]), "Flag não deve ser enviada no modo manual");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 Deno.test("normaliza Pix retornado como array, objeto e vazio", () => {
   const arrayPix = normalizeConexaPixResponse([

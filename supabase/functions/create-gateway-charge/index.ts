@@ -855,6 +855,7 @@ Deno.serve(async (req) => {
                 invoicingMethodId: autoBillet
                   ? settings.conexa_invoicing_method_id
                   : null,
+                generateBillet: autoBillet,
               },
               { agencyId: agency_id, clientId: client_id },
             );
